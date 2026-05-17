@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【高難度】お家を守れ！害虫バスターズ</title>
+
+<link rel="stylesheet" href="./styles.css">
+    
+</head>
+<body>
+
+<header>
+    <h1>⚠️ 防衛線崩壊の危機：ハードモード</h1>
+</header>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="boss-warning">BOSS WARNING!</div>
+    <div id="modal-overlay">
+        <div class="modal-content">
+            <div id="modal-title" class="modal-title">防衛失敗</div>
+            <p id="modal-message">害虫に家を乗っ取られました...</p>
+            <button id="modal-btn" class="modal-btn">再挑戦</button>
+        </div>
+    </div>
+</div>
+
+<div id="ui-panel">
+    <div class="stats-bar">
+        <div class="stat-item">❤️ 耐久: <span id="lives">5</span></div>
+        <div class="stat-item">💰 資金: <span id="money-display">120</span></div>
+        <div class="stat-item">🌊 WAVE: <span id="wave-display">1</span></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="controls" id="tower-controls"></div>
+      
+        <div class="tower-btn" id="upgrade-btn" onclick="selectUpgradeMode()">
+            <div class="tower-icon">🆙</div>
+            <div class="tower-cost">変数</div>
+            <div class="tower-name">強化</div>
+        </div>
+        
+        <button id="wave-btn">開始！</button>
+        <button onclick="saveGame()" style="background:#4a5568; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer;">💾 保存</button>
+        <button onclick="loadGame()" style="background:#4a5568; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer;">📂 読込</button>
+    </div>
+</div>
+
+
+<script src="./config.js"></script>
+<script src="./generateMap.js"></script>
+<script src="./Enemy.js"></script>
+<script src="./Tower.js"></script>
+
+    
+<script>
+
+    
+/**
+ * Game State
+ */
+const state = {
+    money: CONFIG.startMoney,
+    lives: CONFIG.startLives,
+    wave: 1,
+    isPlaying: false,
+    isWaveActive: false,
+    selectedTower: null,
+    map: [],
+    
+    
+    // 変更: 一本道(path)の代わりに、ナビゲーションマップと開始/終了地点を持つ
+    navMap: [],     // navMap[r][c] = [{c, r}, ...] (次の行き先リスト)
+    startPoint: {c: 0, r: 0},
+    endPoints: [],  // 複数のゴールがあり得るため配列に
+    
+    towers: [],
+    enemies: [],
+    projectiles: [],
+    particles: [],
+    waveQueue: [],
+    waveTimer: 0,
+    bossComing: false,
+    
+    isUpgradeMode: false
+};
+
+// Canvas & UI
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const uiLives = document.getElementById('lives');
+const uiMoney = document.getElementById('money-display');
+const uiWave = document.getElementById('wave-display');
+const waveBtn = document.getElementById('wave-btn');
+const towerControls = document.getElementById('tower-controls');
+const modalOverlay = document.getElementById('modal-overlay');
+const modalTitle = document.getElementById('modal-title');
+const modalMessage = document.getElementById('modal-message');
+const modalBtn = document.getElementById('modal-btn');
+const bossWarning = document.getElementById('boss-warning');
+
+/**
+ * Initialization
+ */
+function init() {
+    const containerWidth = Math.min(window.innerWidth - 20, 800);
+    const cols = Math.floor(containerWidth / CONFIG.tileSize);
+
+    /*
+    const rows = 12;
+    
+    CONFIG.cols = cols;
+    CONFIG.rows = rows;
+    
+    canvas.width = cols * CONFIG.tileSize;
+    canvas.height = rows * CONFIG.tileSize;
+    */
+    
+    state.canvas = document.getElementById('gameCanvas');
+    state.ctx = state.canvas.getContext('2d');
+    state.canvas.width = CONFIG.cols * CONFIG.tileSize;
+    state.canvas.height = CONFIG.rows * CONFIG.tileSize;
+    
+    generateMap();
+    setupUI();
+    resetGame();
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function resetGame() {
+    state.money = CONFIG.startMoney;
+    state.lives = CONFIG.startLives;
+    state.wave = 1;
+    state.isWaveActive = false;
+    state.towers = [];
+    state.enemies = [];
+    state.projectiles = [];
+    state.particles = [];
+    state.waveQueue = [];
+    state.isPlaying = true;
+    state.bossComing = false;
+    
+    
+    updateUI();
+    modalOverlay.style.display = 'none';
+    waveBtn.disabled = false;
+    waveBtn.textContent = "WAVE 1 開始";
+    bossWarning.style.opacity = 0;
+}
+
+
+
+function createParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+        state.particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 5,
+            vy: (Math.random() - 0.5) * 5,
+            life: 1.0,
+            color: color
+        });
+    }
+}
+
+function updateParticles() {
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.08;
+        if (p.life <= 0) state.particles.splice(i, 1);
+    }
+}
+
+/**
+ * Game Loop
+ */
+function gameLoop() {
+    if (state.isPlaying) {
+        if (state.isWaveActive) {
+            state.waveTimer--;
+            if (state.waveTimer <= 0 && state.waveQueue.length > 0) {
+                const enemyData = state.waveQueue.shift();
+                state.enemies.push(new Enemy(enemyData.idx, state.wave, enemyData.isBoss));
+                state.waveTimer = enemyData.isBoss ? 100 : Math.max(20, 50 - state.wave * 2); 
+            } else if (state.waveQueue.length === 0 && state.enemies.length === 0) {
+                endWave();
+            }
+        }
+
+        state.towers.forEach(t => t.update());
+
+        for (let i = state.enemies.length - 1; i >= 0; i--) {
+            const enemy = state.enemies[i];
+            const status = enemy.update();
+            
+            if (status === 'finished') {
+                state.lives -= enemy.isBoss ? 5 : 1; // Boss eats 5 hearts!
+                state.enemies.splice(i, 1);
+                updateUI();
+                createParticles(enemy.x, enemy.y, '#fc8181', 15);
+                if (state.lives <= 0) gameOver();
+            } else if (enemy.hp <= 0) {
+                state.money += enemy.reward;
+                state.enemies.splice(i, 1);
+                updateUI();
+                createParticles(enemy.x, enemy.y, '#68d391', 10);
+            }
+        }
+
+        // Projectiles logic
+        for (let i = state.projectiles.length - 1; i >= 0; i--) {
+            const p = state.projectiles[i];
+            if (p.type.id === 'spray' || p.type.id === 'trap') {
+                const speed = p.type.id === 'spray' ? 9 : 7;
+                const dx = p.target.x - p.x;
+                const dy = p.target.y - p.y;
+                const dist = Math.hypot(dx, dy);
+                
+                if (dist < speed) {
+                    p.target.hp -= p.type.damage;
+                    if (p.type.id === 'trap') p.target.frozenTimer = 60;
+                    state.projectiles.splice(i, 1);
+                } else {
+                    p.x += (dx/dist) * speed;
+                    p.y += (dy/dist) * speed;
+                }
+            } else if (p.type.id === 'zapper') {
+                state.projectiles.splice(i, 1); 
+            }
+        }
+        
+        updateParticles();
+    }
+
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// main.js の draw() 関数（修正部分）
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Map Drawing: Draw ALL tiles (Walls and Paths)
+    for (let r = 0; r < CONFIG.rows; r++) {
+        for (let c = 0; c < CONFIG.cols; c++) {
+            
+            // 1. タイルの色を設定
+            if (state.map[r][c] === 1) {
+                // 通路 (Path)
+                ctx.fillStyle = '#2d3748';
+            } else {
+                // 壁 (Wall: 0) - 【修正ポイント】壁も明確な色で描画する
+                ctx.fillStyle = '#1a202c'; 
+            }
+            
+            // 2. タイルを塗りつぶし、グリッド線を描画
+            ctx.fillRect(c * CONFIG.tileSize, r * CONFIG.tileSize, CONFIG.tileSize, CONFIG.tileSize);
+            ctx.strokeStyle = '#4a5568';
+            ctx.strokeRect(c * CONFIG.tileSize, r * CONFIG.tileSize, CONFIG.tileSize, CONFIG.tileSize);
+
+            // 以前のデバッグコードは省略...
+        }
+    }
+    
+    // Start/End Icons
+    // 修正: state.startPoint と state.endPoints を使用
+    if (state.startPoint) {
+        ctx.font = `${CONFIG.tileSize * 0.8}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Start
+        ctx.fillText('🚪', state.startPoint.c * CONFIG.tileSize + CONFIG.tileSize/2, state.startPoint.r * CONFIG.tileSize + CONFIG.tileSize/2);
+        
+        // Ends
+        for (let end of state.endPoints) {
+            // ゴールが壁タイルに描画されるのを避けるため、背景色を一時的に変える
+            ctx.fillStyle = '#e53e3e';
+            ctx.fillRect(end.c * CONFIG.tileSize, end.r * CONFIG.tileSize, CONFIG.tileSize, CONFIG.tileSize);
+            ctx.fillStyle = '#1a202c'; // 色を戻す
+            
+            ctx.fillText('🍰', end.c * CONFIG.tileSize + CONFIG.tileSize/2, end.r * CONFIG.tileSize + CONFIG.tileSize/2);
+        }
+    }
+
+    // 以下、Towers, Enemies などの描画は変更なし
+    state.towers.forEach(t => t.draw(ctx));
+    state.enemies.forEach(e => e.draw(ctx));
+
+    state.projectiles.forEach(p => {
+        if (p.type.id === 'spray') {
+            ctx.fillStyle = '#63b3ed';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+            ctx.fill();
+        } else if (p.type.id === 'trap') {
+            ctx.fillStyle = '#ed8936';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+            ctx.fill();
+        } else if (p.type.id === 'zapper') {
+             ctx.strokeStyle = '#d6bcfa';
+             ctx.lineWidth = 3;
+             ctx.beginPath();
+             ctx.moveTo(p.x, p.y);
+             ctx.lineTo(p.tx, p.ty);
+             ctx.stroke();
+        }
+    });
+
+    // Poison Clouds
+    state.towers.filter(t => t.type.id === 'poison').forEach(t => {
+         ctx.fillStyle = 'rgba(72, 187, 120, 0.15)';
+         ctx.beginPath();
+         ctx.arc(t.x, t.y, t.type.range * CONFIG.tileSize, 0, Math.PI*2);
+         ctx.fill();
+    });
+
+    // Particles
+    for (const p of state.particles) {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 4, 4);
+        ctx.globalAlpha = 1.0;
+    }
+
+    // Selected Range
+    if (state.selectedTower) {
+        // Find grid under mouse? Need mouse pos tracking or handle in draw loop
+        // Simplified: Just highlight valid tiles on hover (not implemented for brevity)
+    }
+}
+
+/**
+ * Wave Control
+ */
+function startWave() {
+    if (state.isWaveActive) return;
+    
+    state.isWaveActive = true;
+    waveBtn.disabled = true;
+    waveBtn.textContent = "侵攻中...";
+    
+    state.waveQueue = [];
+    
+    // Boss Wave Check
+    const isBossWave = state.wave % CONFIG.bossWaveInterval === 0;
+    if (isBossWave) {
+        showBossWarning();
+    }
+
+    // Normal enemies
+    const count = 10 + Math.floor(state.wave * 3) + Math.floor(state.wave / 5) * 2;
+    
+    for(let i=0; i<count; i++) {
+        // 敵の種類の解放ロジック
+        let typesAvailable = 1;
+        if (state.wave >= 3) typesAvailable = 2; // Roach (少し早める)
+        if (state.wave >= 6) typesAvailable = 3; // Spider
+        if (state.wave >= 10) typesAvailable = 4; // Fly (後半の攪乱役)
+        
+        // 確率調整: 後半ほど強い敵が出やすくする
+        let typeIdx = Math.floor(Math.random() * typesAvailable);
+        
+        // Wave 15以降は、低確率で弱い敵(Ant)をスキップして強い敵にする
+        if (state.wave > 15 && typeIdx === 0 && Math.random() > 0.5) {
+            typeIdx = Math.floor(Math.random() * (typesAvailable - 1)) + 1;
+        }
+
+        state.waveQueue.push({idx: typeIdx, isBoss: false});
+    }
+
+    // Boss Wave Check (既存のコードのまま、または以下のように少し強化)
+    if (isBossWave) {
+         // ボスと一緒に取り巻きも少し追加（すでに上で追加されているのでボス単体を追加するだけでOK）
+         // 後半(Wave 30以降)はボスが2体出るなどのギミックを入れても面白いですが、まずは1体で。
+         
+         // ボスの種類をランダム化（既存通り）
+         state.waveQueue.push({idx: Math.floor(Math.random() * 2) + 1, isBoss: true});
+    }
+    
+    state.waveTimer = 0;
+                                                                      
+}
+
+function showBossWarning() {
+    bossWarning.style.opacity = 1;
+    bossWarning.style.transform = 'translate(-50%, -50%) scale(1.2)';
+    setTimeout(() => {
+        bossWarning.style.opacity = 0;
+        bossWarning.style.transform = 'translate(-50%, -50%) scale(1)';
+    }, 2000);
+}
+
+function endWave() {
+    state.isWaveActive = false;
+    state.wave++;
+    updateUI();
+    waveBtn.disabled = false;
+    waveBtn.textContent = `WAVE ${state.wave} 開始`;
+    
+    if (state.wave % CONFIG.bossWaveInterval === 0) {
+        waveBtn.style.backgroundColor = '#e53e3e';
+        waveBtn.textContent = `⚠️ WAVE ${state.wave} BOSS`;
+    } else {
+        waveBtn.style.backgroundColor = '';
+    }
+}
+
+function gameOver() {
+    state.isPlaying = false;
+    modalTitle.textContent = "任務失敗";
+    modalMessage.innerHTML = `害虫の群れに敗北しました...<br>到達: Wave ${state.wave}`;
+    modalBtn.onclick = () => {
+        init();
+    };
+    modalOverlay.style.display = 'flex';
+}
+
+function setupUI() {
+    towerControls.innerHTML = '';
+    Object.keys(TOWERS).forEach(key => {
+        const t = TOWERS[key];
+        const btn = document.createElement('div');
+        btn.className = 'tower-btn';
+        btn.innerHTML = `
+            <div class="tower-icon">${t.icon}</div>
+            <div class="tower-cost">$${t.cost}</div>
+            <div class="tower-name">${t.name}</div>
+        `;
+        btn.onclick = () => selectTower(key, btn);
+        towerControls.appendChild(btn);
+    });
+    waveBtn.onclick = startWave;
+}
+
+function selectTower(key, btnElement) {
+    if (state.selectedTower === key) {
+        state.selectedTower = null;
+        btnElement.classList.remove('selected');
+    } else {
+        document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+        state.selectedTower = key;
+        btnElement.classList.add('selected');
+    }
+}
+
+function updateUI() {
+    uiMoney.textContent = Math.floor(state.money);
+    uiLives.textContent = state.lives;
+    uiWave.textContent = state.wave;
+    
+    const buttons = document.querySelectorAll('.tower-btn');
+    let idx = 0;
+    Object.keys(TOWERS).forEach(key => {
+        const cost = TOWERS[key].cost;
+        if (state.money < cost) {
+            buttons[idx].style.opacity = '0.4';
+            buttons[idx].style.filter = 'grayscale(100%)';
+        } else {
+            buttons[idx].style.opacity = '1';
+            buttons[idx].style.filter = 'none';
+        }
+        idx++;
+    });
+}
+
+// state に現在のモードを保持
+state.isUpgradeMode = false;
+
+function selectUpgradeMode() {
+    state.selectedTower = null;
+    state.isUpgradeMode = !state.isUpgradeMode;
+    
+    // UIの見た目を更新
+    document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+    if (state.isUpgradeMode) {
+        document.getElementById('upgrade-btn').classList.add('selected');
+    }
+}
+    
+function handleInput(e) {
+    if (state.isPlaying === false) return;
+    
+    // イベントのデフォルト動作（スクロール等）を防止
+    if (e.type === 'touchstart') e.preventDefault();
+
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const c = Math.floor(x / CONFIG.tileSize);
+    const r = Math.floor(y / CONFIG.tileSize);
+
+    // 範囲外チェック
+    if (c < 0 || c >= CONFIG.cols || r < 0 || r >= CONFIG.rows) return;
+
+    // --- 1. アップグレードモードの場合 ---
+    if (state.isUpgradeMode === true) {
+        const tower = state.towers.find(t => t.c === c && t.r === r);
+        
+        const maxLv = (typeof CONFIG !== 'undefined' && CONFIG.maxTowerLevel) ? CONFIG.maxTowerLevel : 3;
+        const upgradeCostRate = (typeof CONFIG !== 'undefined' && CONFIG.upgradeCostShield) ? CONFIG.upgradeCostShield : 1.5;
+
+        if (tower && tower.level < maxLv) {
+            const cost = Math.floor(tower.type.cost * upgradeCostRate);
+            if (state.money >= cost) {
+                state.money -= cost;
+                
+                if (typeof tower.upgrade === 'function') {
+                    tower.upgrade();
+                } else {
+                    tower.level = (tower.level || 1) + 1;
+                }
+
+                if (typeof createParticles === 'function') {
+                    createParticles(tower.x, tower.y, '#faf089', 15);
+                }
+                updateUI();
+            }
+        }
+        return; // アップグレードモード時はここで終了
+    }
+    
+    // --- 2. 通常の設置モード ---
+    // ここから下は、すでに定義済みの c, r をそのまま使います（再宣言しない）
+    if (!state.selectedTower) return;
+    
+    if (state.map[r][c] === 1) return; // 通路には置けない
+    if (state.towers.find(t => t.c === c && t.r === r)) return; // 既にタワーがある
+    
+    const towerInfo = TOWERS[state.selectedTower];
+    if (state.money >= towerInfo.cost) {
+        state.money -= towerInfo.cost;
+        state.towers.push(new Tower(c, r, state.selectedTower));
+        createParticles(c * CONFIG.tileSize + CONFIG.tileSize/2, r * CONFIG.tileSize + CONFIG.tileSize/2, '#feb2b2', 8);
+        updateUI();
+    }
+}
+
+
+
+canvas.addEventListener('mousedown', handleInput);
+canvas.addEventListener('touchstart', handleInput, {passive: false});
+
+window.onload = init;
+window.onresize = init;
+
+/**
+ * 左右キーによるタワー選択の切り替え
+ * @param {number} direction - -1 (左) または 1 (右)
+ */
+function selectNextTower(direction) {
+    const towerKeys = Object.keys(TOWERS);
+    let currentIndex = towerKeys.indexOf(state.selectedTower);
+
+    if (currentIndex === -1) {
+        // 現在何も選択されていない場合、最初のタワーを選択
+        currentIndex = 0;
+    } else {
+        // 次のインデックスを計算
+        currentIndex = (currentIndex + direction + towerKeys.length) % towerKeys.length;
+    }
+
+    state.selectedTower = towerKeys[currentIndex];
+    updateTowerButtons(); // UIのボタンハイライトを更新
+}
+
+
+/**
+ * 現在の状態をJSON化してクリップボードにコピー
+ */
+async function saveGame() {
+    if (state.enemies.length > 0) {
+        if (!confirm("Wave進行中に保存すると、敵の位置は保存されず、次のWave開始前として復元されます。\nよろしいですか？")) {
+            return;
+        }
+    }
+
+    // 保存するデータの選定
+    const saveData = {
+        wave: state.wave,
+        money: state.money,
+        lives: state.lives,
+        map: state.map,            
+        startPoint: state.startPoint,
+        endPoints: state.endPoints,
+        // タワー情報の保存
+        towers: state.towers.map(t => ({
+            c: t.c,
+            r: t.r,
+            type: t.type.id // IDだけ保存 ('spray', 'trap' など)
+        }))
+    };
+
+    try {
+        const json = JSON.stringify(saveData);
+        await navigator.clipboard.writeText(json);
+        alert("✅ セーブデータをクリップボードにコピーしました！\n\nメモ帳などに貼り付けて保管してください。");
+    } catch (err) {
+        console.error(err);
+        alert("保存に失敗しました（クリップボードへのアクセスが拒否されました）。");
+    }
+}
+
+function loadGame() {
+    const json = prompt("保管したセーブデータ（JSON文字列）をここに貼り付けてください:");
+    if (!json) return; // キャンセル時
+
+    try {
+        const data = JSON.parse(json);
+
+        // 1. 基本ステータスの復元
+        state.wave = data.wave;
+        state.money = data.money;
+        state.lives = data.lives;
+        
+        // 2. マップの復元
+        state.map = data.map;
+        state.startPoint = data.startPoint;
+        state.endPoints = data.endPoints || [{c: CONFIG.cols - 1, r: Math.floor(CONFIG.rows / 2)}];
+        
+        // ★重要: マップデータから経路(navMap)を再計算
+        // (generateMap.js に rebuildNavMap が追加されている必要があります)
+        if (typeof rebuildNavMap === 'function') {
+            rebuildNavMap();
+        } else {
+            console.error("rebuildNavMap function is missing!");
+            alert("エラー: rebuildNavMap関数が見つかりません。generateMap.jsを確認してください。");
+            return;
+        }
+
+        // 3. タワーの復元
+        // 保存された type ID (例: 'spray') を使って Tower インスタンスを再生成
+        state.towers = data.towers.map(tData => {
+            return new Tower(tData.c, tData.r, tData.type);
+        });
+
+        // 4. Wave状態のリセット
+        state.enemies = [];
+        state.projectiles = []; // 【修正】bullets ではなく projectiles
+        state.particles = [];
+        state.waveQueue = [];
+        state.isPlaying = true; // ゲームループを回すために true
+        state.isWaveActive = false; // Waveは停止状態
+
+        // UI更新
+        const modalOverlay = document.getElementById('modal-overlay');
+        if (modalOverlay) modalOverlay.style.display = 'none';
+        
+        const waveBtn = document.getElementById('wave-btn');
+        if (waveBtn) {
+            waveBtn.disabled = false;
+            waveBtn.textContent = `WAVE ${state.wave} 開始`;
+             // ボスWaveの表示更新ロジックも反映
+            if (state.wave % CONFIG.bossWaveInterval === 0) {
+                waveBtn.style.backgroundColor = '#e53e3e';
+                waveBtn.textContent = `⚠️ WAVE ${state.wave} BOSS`;
+            } else {
+                waveBtn.style.backgroundColor = '';
+            }
+        }
+
+        draw();     // 【修正】drawMap() ではなく draw()
+        updateUI();
+
+        alert(`📂 ロード完了！ Wave ${state.wave} から再開できます。`);
+
+    } catch (err) {
+        console.error(err);
+        alert("❌ ロード失敗：データが壊れているか、コードにエラーがあります。\n" + err.message);
+    }
+}
+    
+    
+document.addEventListener('keydown', (e) => {
+    if (state.isPlaying === false) return; // ゲームがプレイ中でないなら無視
+
+    if (e.key === 'ArrowLeft') {
+        // 左矢印キーが押された
+        selectNextTower(-1);
+        e.preventDefault(); // 画面スクロールなどを防ぐ
+    } else if (e.key === 'ArrowRight') {
+        // 右矢印キーが押された
+        selectNextTower(1);
+        e.preventDefault(); // 画面スクロールなどを防ぐ
+    }
+});
+
+
+    
+        
+</script>
+</body>
+</html>
