@@ -32,6 +32,7 @@ const state = {
     isPlaying: false,
     isWaveActive: false,
     selectedTower: null,
+    mode: null,
     map: [],
     navMap: [],
     startPoint: {c: 0, r: 0},
@@ -42,8 +43,7 @@ const state = {
     particles: [],
     waveQueue: [],
     waveTimer: 0,
-    bossComing: false,
-    isUpgradeMode: false
+    bossComing: false
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -53,11 +53,13 @@ const uiMoney = document.getElementById('money-display');
 const uiWave = document.getElementById('wave-display');
 const waveBtn = document.getElementById('wave-btn');
 const towerControls = document.getElementById('tower-controls');
+const upgradeBtn = document.getElementById('upgrade-btn');
 const modalOverlay = document.getElementById('modal-overlay');
 const modalTitle = document.getElementById('modal-title');
 const modalMessage = document.getElementById('modal-message');
 const modalBtn = document.getElementById('modal-btn');
 const bossWarning = document.getElementById('boss-warning');
+const towerButtons = [];
 
 function init() {
     state.canvas = canvas;
@@ -75,6 +77,8 @@ function resetGame() {
     state.lives = CONFIG.startLives;
     state.wave = 1;
     state.isWaveActive = false;
+    state.selectedTower = null;
+    state.mode = null;
     state.towers = [];
     state.enemies = [];
     state.projectiles = [];
@@ -276,57 +280,60 @@ function gameOver() {
 
 function setupUI() {
     towerControls.innerHTML = '';
-    Object.keys(TOWERS).forEach(key => {
+    towerButtons.length = 0;
+    const keys = Object.keys(TOWERS);
+    keys.forEach(key => {
         const t = TOWERS[key];
         const btn = document.createElement('div');
         btn.className = 'tower-btn';
         btn.innerHTML = `<div class="tower-icon">${t.icon}</div><div class="tower-cost">$${t.cost}</div><div class="tower-name">${t.name}</div>`;
         btn.onclick = () => selectTower(key, btn);
         towerControls.appendChild(btn);
+        towerButtons.push(btn);
     });
     waveBtn.onclick = startWave;
 }
 
 function selectTower(key, btnElement) {
-    if (state.selectedTower === key) {
+    if (state.selectedTower === key && state.mode === 'build') {
         state.selectedTower = null;
-        btnElement.classList.remove('selected');
+        state.mode = null;
     } else {
-        document.querySelectorAll('.controls .tower-btn').forEach(b => b.classList.remove('selected'));
         state.selectedTower = key;
-        btnElement.classList.add('selected');
+        state.mode = 'build';
     }
+    towerButtons.forEach(btn => btn.classList.remove('selected'));
+    if (state.mode === 'build') btnElement.classList.add('selected');
+    upgradeBtn.classList.remove('selected');
 }
 
 function updateTowerButtons() {
-    document.querySelectorAll('.controls .tower-btn').forEach((b, idx) => {
-        const key = Object.keys(TOWERS)[idx];
-        b.classList.toggle('selected', state.selectedTower === key);
+    const keys = Object.keys(TOWERS);
+    towerButtons.forEach((btn, idx) => {
+        const key = keys[idx];
+        btn.classList.toggle('selected', state.mode === 'build' && state.selectedTower === key);
     });
-    document.getElementById('upgrade-btn').classList.toggle('selected', state.isUpgradeMode);
+    upgradeBtn.classList.toggle('selected', state.mode === 'upgrade');
 }
 
 function updateUI() {
     uiMoney.textContent = Math.floor(state.money);
     uiLives.textContent = state.lives;
     uiWave.textContent = state.wave;
-    document.querySelectorAll('.controls .tower-btn').forEach((btn, idx) => {
-        const cost = Object.values(TOWERS)[idx].cost;
-        if (state.money < cost) {
-            btn.style.opacity = '0.4';
-            btn.style.filter = 'grayscale(100%)';
-        } else {
-            btn.style.opacity = '1';
-            btn.style.filter = 'none';
-        }
+    const keys = Object.keys(TOWERS);
+    towerButtons.forEach((btn, idx) => {
+        const cost = TOWERS[keys[idx]].cost;
+        const enabled = state.money >= cost;
+        btn.style.opacity = enabled ? '1' : '0.4';
+        btn.style.filter = enabled ? 'none' : 'grayscale(100%)';
     });
 }
 
 function selectUpgradeMode() {
     state.selectedTower = null;
-    state.isUpgradeMode = !state.isUpgradeMode;
-    document.querySelectorAll('.controls .tower-btn').forEach(b => b.classList.remove('selected'));
-    document.getElementById('upgrade-btn').classList.toggle('selected', state.isUpgradeMode);
+    state.mode = state.mode === 'upgrade' ? null : 'upgrade';
+    towerButtons.forEach(b => b.classList.remove('selected'));
+    upgradeBtn.classList.toggle('selected', state.mode === 'upgrade');
 }
 
 function handleInput(e) {
@@ -340,29 +347,26 @@ function handleInput(e) {
     const c = Math.floor(x / CONFIG.tileSize);
     const r = Math.floor(y / CONFIG.tileSize);
     if (c < 0 || c >= CONFIG.cols || r < 0 || r >= CONFIG.rows) return;
-    if (state.isUpgradeMode) {
+    if (state.mode === 'upgrade') {
         const tower = state.towers.find(t => t.c === c && t.r === r);
-        if (tower && tower.level < CONFIG.maxTowerLevel) {
-            const cost = Math.floor(tower.type.cost * CONFIG.upgradeCostShield);
-            if (state.money >= cost) {
-                state.money -= cost;
-                tower.upgrade ? tower.upgrade() : tower.level++;
-                createParticles(tower.x, tower.y, '#faf089', 15);
-                updateUI();
-            }
-        }
+        if (!tower || tower.level >= CONFIG.maxTowerLevel) return;
+        const cost = Math.floor(tower.type.cost * CONFIG.upgradeCostShield);
+        if (state.money < cost) return;
+        state.money -= cost;
+        tower.upgrade ? tower.upgrade() : tower.level++;
+        createParticles(tower.x, tower.y, '#faf089', 15);
+        updateUI();
         return;
     }
-    if (!state.selectedTower) return;
+    if (state.mode !== 'build' || !state.selectedTower) return;
     if (state.map[r][c] === 1) return;
-    if (state.towers.find(t => t.c === c && t.r === r)) return;
+    if (state.towers.some(t => t.c === c && t.r === r)) return;
     const towerInfo = TOWERS[state.selectedTower];
-    if (state.money >= towerInfo.cost) {
-        state.money -= towerInfo.cost;
-        state.towers.push(new Tower(c, r, state.selectedTower));
-        createParticles(c * CONFIG.tileSize + CONFIG.tileSize / 2, r * CONFIG.tileSize + CONFIG.tileSize / 2, '#feb2b2', 8);
-        updateUI();
-    }
+    if (state.money < towerInfo.cost) return;
+    state.money -= towerInfo.cost;
+    state.towers.push(new Tower(c, r, state.selectedTower));
+    createParticles(c * CONFIG.tileSize + CONFIG.tileSize / 2, r * CONFIG.tileSize + CONFIG.tileSize / 2, '#feb2b2', 8);
+    updateUI();
 }
 
 document.addEventListener('keydown', e => {
@@ -427,6 +431,8 @@ function loadGame() {
         state.projectiles = [];
         state.particles = [];
         state.waveQueue = [];
+        state.selectedTower = null;
+        state.mode = null;
         state.isPlaying = true;
         state.isWaveActive = false;
         modalOverlay.style.display = 'none';
@@ -508,32 +514,20 @@ class Enemy {
                 return 'active';
             }
             const goal = state.endPoints[0];
-            const candidates = [];
-            for (const next of nextOptions) {
-                if (next.c === this.prevC && next.r === this.prevR && nextOptions.length > 1) continue;
-                const distance = Math.abs(goal.c - next.c) + Math.abs(goal.r - next.r);
-                candidates.push({pos: next, distance});
-            }
+            const candidates = nextOptions.filter(next => !(next.c === this.prevC && next.r === this.prevR && nextOptions.length > 1));
             if (candidates.length === 0) {
                 const prevPos = nextOptions.find(opt => opt.c === this.prevC && opt.r === this.prevR);
-                if (prevPos) candidates.push({pos: prevPos, distance: Infinity});
+                if (prevPos) candidates.push(prevPos);
             }
-            let selectedCandidate = null;
-            if (candidates.length > 0) {
-                candidates.sort((a, b) => a.distance - b.distance);
-                const baseDeviationChance = 0.3;
-                const wavePenalty = (state.wave - 1) * 0.02;
-                const detourChance = Math.max(0, baseDeviationChance - wavePenalty);
-                if (candidates.length > 1 && Math.random() < detourChance) {
-                    selectedCandidate = candidates[1 + Math.floor(Math.random() * (candidates.length - 1))];
-                }
-                if (!selectedCandidate) {
-                    const minDistance = candidates[0].distance;
-                    const bestCandidates = candidates.filter(c => c.distance === minDistance);
-                    selectedCandidate = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
-                }
+            candidates.sort((a, b) => {
+                const da = Math.abs(goal.c - a.c) + Math.abs(goal.r - a.r);
+                const db = Math.abs(goal.c - b.c) + Math.abs(goal.r - b.r);
+                return da - db;
+            });
+            let next = candidates[0] || nextOptions[0];
+            if (candidates.length > 1 && Math.random() < Math.max(0, 0.3 - (state.wave - 1) * 0.02)) {
+                next = candidates[1 + Math.floor(Math.random() * (candidates.length - 1))];
             }
-            const next = selectedCandidate ? selectedCandidate.pos : nextOptions[0];
             this.targetC = next.c;
             this.targetR = next.r;
         } else {
@@ -600,25 +594,21 @@ class Tower {
 
     update() {
         if (this.cooldown > 0) this.cooldown--;
-        let target = null;
-        let bestScore = -Infinity;
         const range = this.getRange();
+        let target = null;
+        let minDist = Infinity;
         for (const enemy of state.enemies) {
             const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
-            if (dist <= range) {
-                const score = -dist;
-                if (score > bestScore) {
-                    bestScore = score;
-                    target = enemy;
-                }
+            if (dist <= range && dist < minDist) {
+                minDist = dist;
+                target = enemy;
             }
         }
-        if (target) {
-            this.angle = Math.atan2(target.y - this.y, target.x - this.x);
-            if (this.cooldown <= 0) {
-                this.fire(target);
-                this.cooldown = this.type.cooldown;
-            }
+        if (!target) return;
+        this.angle = Math.atan2(target.y - this.y, target.x - this.x);
+        if (this.cooldown <= 0) {
+            this.fire(target);
+            this.cooldown = this.type.cooldown;
         }
     }
 
