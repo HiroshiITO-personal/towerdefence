@@ -61,6 +61,98 @@ const modalBtn = document.getElementById('modal-btn');
 const bossWarning = document.getElementById('boss-warning');
 const towerButtons = [];
 
+const audio = {ctx: null, master: null, bgmTimer: null, bgmStep: 0, unlocked: false};
+
+function ensureAudio() {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    if (!audio.ctx) {
+        audio.ctx = new AudioCtx();
+        audio.master = audio.ctx.createGain();
+        audio.master.gain.value = 0.14;
+        audio.master.connect(audio.ctx.destination);
+    }
+    if (audio.ctx.state === 'suspended') {
+        audio.ctx.resume();
+    }
+    return audio.ctx;
+}
+
+function unlockAudio() {
+    const ctx = ensureAudio();
+    if (!ctx || audio.unlocked) return;
+    audio.unlocked = true;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 440;
+    gain.gain.value = 0.0001;
+    osc.connect(gain);
+    gain.connect(audio.master || ctx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.03, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+    osc.stop(ctx.currentTime + 0.09);
+}
+
+function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', delay = 0) {
+    if (!audio.ctx || !audio.master) return;
+    const t = audio.ctx.currentTime + delay;
+    const osc = audio.ctx.createOscillator();
+    const gain = audio.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(volume, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.connect(gain);
+    gain.connect(audio.master);
+    osc.start(t);
+    osc.stop(t + duration + 0.03);
+}
+
+function playSfx(kind) {
+    if (!audio.ctx) return;
+    const now = audio.ctx.currentTime;
+    if (kind === 'build') {
+        playTone(660, 0.08, 0.07, 'triangle');
+        playTone(990, 0.12, 0.05, 'triangle', 0.06);
+    } else if (kind === 'upgrade') {
+        playTone(520, 0.08, 0.08, 'sawtooth');
+        playTone(780, 0.12, 0.07, 'sawtooth', 0.08);
+        playTone(1040, 0.14, 0.05, 'triangle', 0.14);
+    } else if (kind === 'wave') {
+        playTone(220, 0.16, 0.08, 'square');
+        playTone(330, 0.18, 0.08, 'square', 0.08);
+        playTone(440, 0.22, 0.08, 'square', 0.16);
+    } else if (kind === 'lose') {
+        playTone(180, 0.24, 0.08, 'sawtooth');
+        playTone(140, 0.38, 0.08, 'sawtooth', 0.12);
+    } else {
+        playTone(440, 0.08, 0.05, 'triangle');
+    }
+}
+
+function startBGM() {
+    const ctx = ensureAudio();
+    if (!ctx || audio.bgmTimer) return;
+    const pattern = [261.63, 329.63, 392.0, 523.25, 392.0, 329.63, 293.66, 349.23];
+    audio.bgmTimer = setInterval(() => {
+        if (!state.isPlaying) return;
+        const note = pattern[audio.bgmStep % pattern.length];
+        playTone(note, 0.18, 0.028, 'sine');
+        if (audio.bgmStep % 2 === 0) playTone(note / 2, 0.22, 0.02, 'triangle', 0.05);
+        audio.bgmStep++;
+    }, 260);
+}
+
+function stopBGM() {
+    if (audio.bgmTimer) {
+        clearInterval(audio.bgmTimer);
+        audio.bgmTimer = null;
+    }
+}
+
 function init() {
     state.canvas = canvas;
     state.ctx = ctx;
@@ -223,6 +315,8 @@ function draw() {
 
 function startWave() {
     if (state.isWaveActive) return;
+    ensureAudio();
+    playSfx('wave');
     state.isWaveActive = true;
     waveBtn.disabled = true;
     waveBtn.textContent = 'Storm in progress...';
@@ -272,6 +366,7 @@ function endWave() {
 
 function gameOver() {
     state.isPlaying = false;
+    playSfx('lose');
     modalTitle.textContent = 'Magic Faded';
     modalMessage.innerHTML = `The castle was overrun by the storm...<br>Reached: Wave ${state.wave}`;
     modalBtn.onclick = () => init();
@@ -291,7 +386,11 @@ function setupUI() {
         towerControls.appendChild(btn);
         towerButtons.push(btn);
     });
-    waveBtn.onclick = startWave;
+    waveBtn.onclick = () => {
+        unlockAudio();
+        startBGM();
+        startWave();
+    };
 }
 
 function selectTower(key, btnElement) {
@@ -354,6 +453,7 @@ function handleInput(e) {
         if (state.money < cost) return;
         state.money -= cost;
         tower.upgrade ? tower.upgrade() : tower.level++;
+        playSfx('upgrade');
         createParticles(tower.x, tower.y, '#faf089', 15);
         updateUI();
         return;
@@ -365,11 +465,13 @@ function handleInput(e) {
     if (state.money < towerInfo.cost) return;
     state.money -= towerInfo.cost;
     state.towers.push(new Tower(c, r, state.selectedTower));
+    playSfx('build');
     createParticles(c * CONFIG.tileSize + CONFIG.tileSize / 2, r * CONFIG.tileSize + CONFIG.tileSize / 2, '#feb2b2', 8);
     updateUI();
 }
 
 document.addEventListener('keydown', e => {
+    unlockAudio();
     if (!state.isPlaying) return;
     if (e.key === 'ArrowLeft') {
         selectNextTower(-1);
@@ -380,6 +482,11 @@ document.addEventListener('keydown', e => {
     }
 });
 
+window.addEventListener('pointerdown', () => {
+    unlockAudio();
+    startBGM();
+}, {once: true});
+
 function selectNextTower(direction) {
     const towerKeys = Object.keys(TOWERS);
     let currentIndex = towerKeys.indexOf(state.selectedTower);
@@ -389,6 +496,8 @@ function selectNextTower(direction) {
 }
 
 async function saveGame() {
+    ensureAudio();
+    playSfx('build');
     if (state.enemies.length > 0 && !confirm('Saving while a wave is active will reset enemy positions until the next wave begins.\nProceed?')) return;
     const saveData = {
         wave: state.wave,
@@ -409,6 +518,8 @@ async function saveGame() {
 }
 
 function loadGame() {
+    ensureAudio();
+    playSfx('upgrade');
     const json = prompt('Paste your saved JSON data here:');
     if (!json) return;
     try {
