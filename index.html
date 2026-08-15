@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>aaaお家を守れ！害虫バスターズ</title>
+    <title>Unicorn Rainbow Defense</title>
 
 <link rel="stylesheet" href="./styles.css">
     
@@ -11,39 +11,39 @@
 <body>
 
 <header>
-    <h1>⚠️ 防衛線崩壊の危機：ハードモード</h1>
+    <h1>✨ Unicorn Castle Defense: Rainbow Rush</h1>
 </header>
 
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
-    <div id="boss-warning">BOSS WARNING!</div>
+    <div id="boss-warning">🌈 BOSS RAINBOW!</div>
     <div id="modal-overlay">
         <div class="modal-content">
-            <div id="modal-title" class="modal-title">防衛失敗</div>
-            <p id="modal-message">害虫に家を乗っ取られました...</p>
-            <button id="modal-btn" class="modal-btn">再挑戦</button>
+            <div id="modal-title" class="modal-title">Castle Lost</div>
+            <p id="modal-message">The rainbow magic faded...</p>
+            <button id="modal-btn" class="modal-btn">Try Again</button>
         </div>
     </div>
 </div>
 
 <div id="ui-panel">
     <div class="stats-bar">
-        <div class="stat-item">❤️ 耐久: <span id="lives">5</span></div>
-        <div class="stat-item">💰 資金: <span id="money-display">120</span></div>
-        <div class="stat-item">🌊 WAVE: <span id="wave-display">1</span></div>
+        <div class="stat-item">💖 Hearts: <span id="lives">5</span></div>
+        <div class="stat-item">🌟 Magic: <span id="money-display">120</span></div>
+        <div class="stat-item">🌈 Wave: <span id="wave-display">1</span></div>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
         <div class="controls" id="tower-controls"></div>
       
         <div class="tower-btn" id="upgrade-btn" onclick="selectUpgradeMode()">
-            <div class="tower-icon">🆙</div>
-            <div class="tower-cost">変数</div>
-            <div class="tower-name">強化</div>
+            <div class="tower-icon">✨</div>
+            <div class="tower-cost">+</div>
+            <div class="tower-name">Boost</div>
         </div>
         
-        <button id="wave-btn">開始！</button>
-        <button onclick="saveGame()" style="background:#4a5568; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer;">💾 保存</button>
-        <button onclick="loadGame()" style="background:#4a5568; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer;">📂 読込</button>
+        <button id="wave-btn">Start!</button>
+        <button onclick="saveGame()" style="background:linear-gradient(135deg,#ff9ecb,#a78bfa); color:#fff; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700; box-shadow:0 4px 12px rgba(168,85,247,0.25);">💾 Save</button>
+        <button onclick="loadGame()" style="background:linear-gradient(135deg,#7dd3fc,#86efac); color:#fff; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700; box-shadow:0 4px 12px rgba(14,165,233,0.25);">📂 Load</button>
     </div>
 </div>
 

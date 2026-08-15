@@ -12,17 +12,17 @@ const CONFIG = {
 };
 
 const TOWERS = {
-    spray: {id: 'spray', name: 'スプレー', icon: '🧴', cost: 60, range: 3.5, damage: 20, cooldown: 15, color: '#63b3ed', desc: '基本武装。'},
-    trap: {id: 'trap', name: '粘着罠', icon: '🕸️', cost: 90, range: 2.2, damage: 10, slow: 0.4, cooldown: 8, color: '#ed8936', desc: '敵を遅くする。'},
-    zapper: {id: 'zapper', name: '電撃', icon: '⚡', cost: 220, range: 4.5, damage: 100, cooldown: 65, color: '#9f7aea', desc: '対ボス用高火力。'},
-    poison: {id: 'poison', name: '猛毒', icon: '☠️', cost: 350, range: 3.0, damage: 5, cooldown: 5, area: true, color: '#48bb78', desc: '範囲継続ダメージ。'}
+    spray: {id: 'spray', name: 'Sparkle', icon: '🦄', cost: 60, range: 3.5, damage: 20, cooldown: 15, color: '#ff7ac6', desc: 'Bright magical beams.'},
+    trap: {id: 'trap', name: 'Star Trap', icon: '✨', cost: 90, range: 2.2, damage: 10, slow: 0.4, cooldown: 8, color: '#fbbf24', desc: 'Slows rainbow invaders.'},
+    zapper: {id: 'zapper', name: 'Rainbow Bolt', icon: '🌈', cost: 220, range: 4.5, damage: 100, cooldown: 65, color: '#8b5cf6', desc: 'Heavy boss damage.'},
+    poison: {id: 'poison', name: 'Moon Mist', icon: '💫', cost: 350, range: 3.0, damage: 5, cooldown: 5, area: true, color: '#34d399', desc: 'Area magic damage.'}
 };
 
 const ENEMIES = [
-    {name: 'Ant', icon: '🐜', speed: 0.06, hpMod: 1.0, reward: 5},
-    {name: 'Roach', icon: '🪳', speed: 0.09, hpMod: 1.2, reward: 12},
-    {name: 'Spider', icon: '🕷️', speed: 0.04, hpMod: 3.5, reward: 20},
-    {name: 'Fly', icon: '🪰', speed: 0.11, hpMod: 0.5, reward: 10}
+    {name: 'Spark Bug', icon: '🐞', speed: 0.06, hpMod: 1.0, reward: 5},
+    {name: 'Rain Moth', icon: '🦋', speed: 0.09, hpMod: 1.2, reward: 12},
+    {name: 'Cloud Bat', icon: '🦇', speed: 0.04, hpMod: 3.5, reward: 20},
+    {name: 'Dew Fly', icon: '🪶', speed: 0.11, hpMod: 0.5, reward: 10}
 ];
 
 const state = {
@@ -89,7 +89,7 @@ function resetGame() {
     updateUI();
     modalOverlay.style.display = 'none';
     waveBtn.disabled = false;
-    waveBtn.textContent = 'WAVE 1 開始';
+    waveBtn.textContent = 'Start Wave 1';
     bossWarning.style.opacity = 0;
 }
 
@@ -167,9 +167,9 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (let r = 0; r < CONFIG.rows; r++) {
         for (let c = 0; c < CONFIG.cols; c++) {
-            ctx.fillStyle = state.map[r][c] === 1 ? '#2d3748' : '#1a202c';
+            ctx.fillStyle = state.map[r][c] === 1 ? '#bfe7ff' : '#f3d9ff';
             ctx.fillRect(c * CONFIG.tileSize, r * CONFIG.tileSize, CONFIG.tileSize, CONFIG.tileSize);
-            ctx.strokeStyle = '#4a5568';
+            ctx.strokeStyle = 'rgba(255,255,255,0.7)';
             ctx.strokeRect(c * CONFIG.tileSize, r * CONFIG.tileSize, CONFIG.tileSize, CONFIG.tileSize);
         }
     }
@@ -177,12 +177,12 @@ function draw() {
         ctx.font = `${CONFIG.tileSize * 0.8}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('🚪', state.startPoint.c * CONFIG.tileSize + CONFIG.tileSize / 2, state.startPoint.r * CONFIG.tileSize + CONFIG.tileSize / 2);
+        ctx.fillText('🦄', state.startPoint.c * CONFIG.tileSize + CONFIG.tileSize / 2, state.startPoint.r * CONFIG.tileSize + CONFIG.tileSize / 2);
         for (let end of state.endPoints) {
-            ctx.fillStyle = '#e53e3e';
+            ctx.fillStyle = '#f9a8d4';
             ctx.fillRect(end.c * CONFIG.tileSize, end.r * CONFIG.tileSize, CONFIG.tileSize, CONFIG.tileSize);
-            ctx.fillStyle = '#1a202c';
-            ctx.fillText('🍰', end.c * CONFIG.tileSize + CONFIG.tileSize / 2, end.r * CONFIG.tileSize + CONFIG.tileSize / 2);
+            ctx.fillStyle = '#7c3aed';
+            ctx.fillText('🏰', end.c * CONFIG.tileSize + CONFIG.tileSize / 2, end.r * CONFIG.tileSize + CONFIG.tileSize / 2);
         }
     }
     state.towers.forEach(t => t.draw(ctx));
@@ -225,7 +225,7 @@ function startWave() {
     if (state.isWaveActive) return;
     state.isWaveActive = true;
     waveBtn.disabled = true;
-    waveBtn.textContent = '侵攻中...';
+    waveBtn.textContent = 'Storm in progress...';
     state.waveQueue = [];
     const isBossWave = state.wave % CONFIG.bossWaveInterval === 0;
     if (isBossWave) showBossWarning();
@@ -261,19 +261,19 @@ function endWave() {
     state.wave++;
     updateUI();
     waveBtn.disabled = false;
-    waveBtn.textContent = `WAVE ${state.wave} 開始`;
+    waveBtn.textContent = `Start Wave ${state.wave}`;
     if (state.wave % CONFIG.bossWaveInterval === 0) {
-        waveBtn.style.backgroundColor = '#e53e3e';
-        waveBtn.textContent = `⚠️ WAVE ${state.wave} BOSS`;
+        waveBtn.style.background = 'linear-gradient(135deg, #fb7185, #f59e0b, #a78bfa)';
+        waveBtn.textContent = `⚠️ Wave ${state.wave} Boss`;
     } else {
-        waveBtn.style.backgroundColor = '';
+        waveBtn.style.background = '';
     }
 }
 
 function gameOver() {
     state.isPlaying = false;
-    modalTitle.textContent = '任務失敗';
-    modalMessage.innerHTML = `害虫の群れに敗北しました...<br>到達: Wave ${state.wave}`;
+    modalTitle.textContent = 'Magic Faded';
+    modalMessage.innerHTML = `The castle was overrun by the storm...<br>Reached: Wave ${state.wave}`;
     modalBtn.onclick = () => init();
     modalOverlay.style.display = 'flex';
 }
@@ -389,7 +389,7 @@ function selectNextTower(direction) {
 }
 
 async function saveGame() {
-    if (state.enemies.length > 0 && !confirm('Wave進行中に保存すると、敵の位置は保存されず、次のWave開始前として復元されます。\nよろしいですか？')) return;
+    if (state.enemies.length > 0 && !confirm('Saving while a wave is active will reset enemy positions until the next wave begins.\nProceed?')) return;
     const saveData = {
         wave: state.wave,
         money: state.money,
@@ -401,15 +401,15 @@ async function saveGame() {
     };
     try {
         await navigator.clipboard.writeText(JSON.stringify(saveData));
-        alert('✅ セーブデータをクリップボードにコピーしました！\n\nメモ帳などに貼り付けて保管してください。');
+        alert('✅ Saved to clipboard!\n\nPaste it into a notes app or text file to keep your rainbow progress safe.');
     } catch (err) {
         console.error(err);
-        alert('保存に失敗しました（クリップボードへのアクセスが拒否されました）。');
+        alert('Save failed because clipboard access was denied.');
     }
 }
 
 function loadGame() {
-    const json = prompt('保管したセーブデータ（JSON文字列）をここに貼り付けてください:');
+    const json = prompt('Paste your saved JSON data here:');
     if (!json) return;
     try {
         const data = JSON.parse(json);
@@ -423,7 +423,7 @@ function loadGame() {
             rebuildNavMap();
         } else {
             console.error('rebuildNavMap function is missing!');
-            alert('エラー: rebuildNavMap関数が見つかりません。generateMap.jsを確認してください。');
+            alert('Error: rebuildNavMap was not found. Check the map generation code.');
             return;
         }
         state.towers = data.towers.map(tData => new Tower(tData.c, tData.r, tData.type));
@@ -437,19 +437,19 @@ function loadGame() {
         state.isWaveActive = false;
         modalOverlay.style.display = 'none';
         waveBtn.disabled = false;
-        waveBtn.textContent = `WAVE ${state.wave} 開始`;
+        waveBtn.textContent = `Start Wave ${state.wave}`;
         if (state.wave % CONFIG.bossWaveInterval === 0) {
-            waveBtn.style.backgroundColor = '#e53e3e';
-            waveBtn.textContent = `⚠️ WAVE ${state.wave} BOSS`;
+            waveBtn.style.background = 'linear-gradient(135deg, #fb7185, #f59e0b, #a78bfa)';
+            waveBtn.textContent = `⚠️ Wave ${state.wave} Boss`;
         } else {
-            waveBtn.style.backgroundColor = '';
+            waveBtn.style.background = '';
         }
         draw();
         updateUI();
-        alert(`📂 ロード完了！ Wave ${state.wave} から再開できます。`);
+        alert(`📂 Loaded! You can continue from Wave ${state.wave}.`);
     } catch (err) {
         console.error(err);
-        alert('❌ ロード失敗：データが壊れているか、コードにエラーがあります。\n' + err.message);
+        alert('❌ Load failed: the data is corrupted or the game code has an error.\n' + err.message);
     }
 }
 
