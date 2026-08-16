@@ -69,7 +69,7 @@ function ensureAudio() {
     if (!audio.ctx) {
         audio.ctx = new AudioCtx();
         audio.master = audio.ctx.createGain();
-        audio.master.gain.value = 0.14;
+        audio.master.gain.value = 0.22;
         audio.master.connect(audio.ctx.destination);
     }
     if (audio.ctx.state === 'suspended') {
@@ -97,18 +97,23 @@ function unlockAudio() {
 
 function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', delay = 0) {
     if (!audio.ctx || !audio.master) return;
+    
     const t = audio.ctx.currentTime + delay;
     const osc = audio.ctx.createOscillator();
-    const gain = audio.ctx.createGain();
+    const gain = audio.ctx.createGain();   
     osc.type = type;
     osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(volume, t + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    const attackTime = 0.02;
+    const releaseTime = Math.max(0.05, duration - attackTime);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(volume, t + attackTime);
+    gain.gain.linearRampToValueAtTime(0, t + attackTime + releaseTime);
+    
     osc.connect(gain);
     gain.connect(audio.master);
+    
     osc.start(t);
-    osc.stop(t + duration + 0.03);
+    osc.stop(t + duration + 0.05);
 }
 
 function playSfx(kind) {
@@ -125,6 +130,25 @@ function playSfx(kind) {
         playTone(220, 0.16, 0.08, 'square');
         playTone(330, 0.18, 0.08, 'square', 0.08);
         playTone(440, 0.22, 0.08, 'square', 0.16);
+    } else if (kind === 'spray') {
+        playTone(620, 0.06, 0.05, 'triangle');
+        playTone(780, 0.08, 0.04, 'triangle', 0.04);
+    } else if (kind === 'trap') {
+        playTone(280, 0.09, 0.045, 'square');
+        playTone(220, 0.12, 0.035, 'square', 0.05);
+    } else if (kind === 'zapper') {
+        playTone(523.25, 0.12, 0.05, 'sine');
+        playTone(659.25, 0.12, 0.05, 'sine', 0.03);
+        playTone(783.99, 0.12, 0.05, 'sine', 0.06);
+        playTone(1046.50, 0.25, 0.06, 'triangle', 0.09);
+        playTone(1567.98, 0.15, 0.04, 'sine', 0.12);
+        playTone(2093.00, 0.20, 0.03, 'sine', 0.15);
+        playTone(1046.50, 0.18, 0.03, 'sine', 0.20);
+        playTone(1567.98, 0.18, 0.02, 'sine', 0.26);
+        playTone(2093.00, 0.25, 0.01, 'sine', 0.32);
+    } else if (kind === 'poison') {
+        playTone(220, 0.1, 0.05, 'sine');
+        playTone(160, 0.14, 0.04, 'sine', 0.04);
     } else if (kind === 'lose') {
         playTone(180, 0.24, 0.08, 'sawtooth');
         playTone(140, 0.38, 0.08, 'sawtooth', 0.12);
@@ -136,15 +160,41 @@ function playSfx(kind) {
 function startBGM() {
     const ctx = ensureAudio();
     if (!ctx || audio.bgmTimer) return;
-    const pattern = [261.63, 329.63, 392.0, 523.25, 392.0, 329.63, 293.66, 349.23];
+    unlockAudio();
+    const melody = [
+        293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66, 261.63,
+        293.66, 349.23, 440.00, 523.25, 440.00, 392.00, 349.23, 392.00,
+        440.00, 466.16, 440.00, 392.00, 349.23, 329.63, 293.66, 329.63,
+        349.23, 392.00, 329.63, 293.66, 293.66,      0, 293.66,      0
+    ];
+
+    const drone = [
+        146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 130.81,
+        146.83, 174.61, 220.00, 220.00, 220.00, 196.00, 174.61, 196.00,
+        220.00, 233.08, 220.00, 196.00, 174.61, 146.83, 146.83, 164.81,
+        174.61, 196.00, 164.81, 146.83, 146.83,      0, 146.83,      0
+    ];
+    
     audio.bgmTimer = setInterval(() => {
         if (!state.isPlaying) return;
-        const note = pattern[audio.bgmStep % pattern.length];
-        playTone(note, 0.18, 0.028, 'sine');
-        if (audio.bgmStep % 2 === 0) playTone(note / 2, 0.22, 0.02, 'triangle', 0.05);
-        audio.bgmStep++;
-    }, 260);
+        const step = audio.bgmStep++ % melody.length;
+        
+        const mNote = melody[step];
+        const dNote = drone[step];
+
+        if (mNote > 0) {
+            playTone(mNote, 0.75, 0.10, 'sine');
+            playTone(mNote, 0.70, 0.05, 'triangle', 0.01);
+            playTone(mNote * 2, 0.60, 0.02, 'sine', 0.03);
+        }
+
+        if (dNote > 0) {
+            playTone(dNote, 0.8, 0.12, 'triangle');
+            playTone(dNote / 2, 0.85, 0.08, 'sine');
+        }
+    }, 460); 
 }
+
 
 function stopBGM() {
     if (audio.bgmTimer) {
@@ -269,7 +319,7 @@ function draw() {
         ctx.font = `${CONFIG.tileSize * 0.8}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('🦄', state.startPoint.c * CONFIG.tileSize + CONFIG.tileSize / 2, state.startPoint.r * CONFIG.tileSize + CONFIG.tileSize / 2);
+        ctx.fillText('🌳', state.startPoint.c * CONFIG.tileSize + CONFIG.tileSize / 2, state.startPoint.r * CONFIG.tileSize + CONFIG.tileSize / 2);
         for (let end of state.endPoints) {
             ctx.fillStyle = '#f9a8d4';
             ctx.fillRect(end.c * CONFIG.tileSize, end.r * CONFIG.tileSize, CONFIG.tileSize, CONFIG.tileSize);
@@ -366,6 +416,7 @@ function endWave() {
 
 function gameOver() {
     state.isPlaying = false;
+    stopBGM();
     playSfx('lose');
     modalTitle.textContent = 'Magic Faded';
     modalMessage.innerHTML = `The castle was overrun by the storm...<br>Reached: Wave ${state.wave}`;
@@ -726,13 +777,16 @@ class Tower {
     fire(target) {
         if (this.type.id === 'spray' || this.type.id === 'zapper') {
             state.projectiles.push({x: this.x, y: this.y, tx: target.x, ty: target.y, target, type: this.type, active: true});
+            playSfx(this.type.id);
             if (this.type.id === 'zapper') {
                 target.hp -= this.type.damage;
                 createParticles(target.x, target.y, '#f6e05e', 5);
             }
         } else if (this.type.id === 'trap') {
             state.projectiles.push({x: this.x, y: this.y, target, type: this.type, active: true, speed: 6});
+            playSfx(this.type.id);
         } else if (this.type.id === 'poison') {
+            playSfx(this.type.id);
             for (const enemy of state.enemies) {
                 const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
                 if (dist <= this.type.range * CONFIG.tileSize) {
