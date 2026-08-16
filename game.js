@@ -95,9 +95,11 @@ function unlockAudio() {
     osc.stop(ctx.currentTime + 0.09);
 }
 
+let activeSoundCount = 0;
+
 function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', delay = 0) {
     if (!audio.ctx || !audio.master) return;
-    
+    if (activeSoundCount > 12) return;
     const t = audio.ctx.currentTime + delay;
     const osc = audio.ctx.createOscillator();
     const gain = audio.ctx.createGain();   
@@ -108,12 +110,15 @@ function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', del
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(volume, t + attackTime);
     gain.gain.linearRampToValueAtTime(0, t + attackTime + releaseTime);
-    
     osc.connect(gain);
     gain.connect(audio.master);
-    
+    activeSoundCount++;
     osc.start(t);
     osc.stop(t + duration + 0.05);
+    
+    osc.onended = () => {
+        activeSoundCount = Math.max(0, activeSoundCount - 1);
+    };
 }
 
 function playSfx(kind) {
