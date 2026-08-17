@@ -208,6 +208,30 @@ function stopBGM() {
     }
 }
 
+function resizeCanvas() {
+    const container = document.getElementById('game-container');
+    const maxWidth = window.innerWidth - 20;
+    const maxHeight = window.innerHeight - 200;
+    const aspectRatio = CONFIG.cols / CONFIG.rows;
+    
+    let displayWidth = maxWidth;
+    let displayHeight = maxWidth / aspectRatio;
+    
+    if (displayHeight > maxHeight) {
+        displayHeight = maxHeight;
+        displayWidth = displayHeight * aspectRatio;
+    }
+    
+    state.canvasDisplayWidth = displayWidth;
+    state.canvasDisplayHeight = displayHeight;
+    state.scale = displayWidth / (CONFIG.cols * CONFIG.tileSize);
+    
+    canvas.width = CONFIG.cols * CONFIG.tileSize;
+    canvas.height = CONFIG.rows * CONFIG.tileSize;
+    container.style.width = displayWidth + 'px';
+    container.style.height = displayHeight + 'px';
+}
+
 function init() {
     state.canvas = canvas;
     state.ctx = ctx;
@@ -257,13 +281,15 @@ function updateParticles() {
 }
 
 function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
     if (state.isPlaying) {
         if (state.isWaveActive) {
             state.waveTimer--;
             if (state.waveTimer <= 0 && state.waveQueue.length > 0) {
                 const enemyData = state.waveQueue.shift();
                 state.enemies.push(new Enemy(enemyData.idx, state.wave, enemyData.isBoss));
-                state.waveTimer = enemyData.isBoss ? 100 : Math.max(20, 50 - state.wave * 2);
+                state.waveTimer = enemyData.isBoss ? 200 : Math.max(40, 55 - state.wave * 4);
             } else if (state.waveQueue.length === 0 && state.enemies.length === 0) {
                 endWave();
             }
@@ -393,7 +419,7 @@ function startWave() {
     if (isBossWave) {
         state.waveQueue.push({idx: Math.floor(Math.random() * 2) + 1, isBoss: true});
     }
-    state.waveTimer = 0;
+    state.waveTimer = 30;
 }
 
 function showBossWarning() {
@@ -497,8 +523,8 @@ function handleInput(e) {
     const rect = canvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const x = (clientX - rect.left) * (canvas.width / rect.width);
+    const y = (clientY - rect.top) * (canvas.height / rect.height);
     const c = Math.floor(x / CONFIG.tileSize);
     const r = Math.floor(y / CONFIG.tileSize);
     if (c < 0 || c >= CONFIG.cols || r < 0 || r >= CONFIG.rows) return;
@@ -534,6 +560,21 @@ document.addEventListener('keydown', e => {
         e.preventDefault();
     } else if (e.key === 'ArrowRight') {
         selectNextTower(1);
+        e.preventDefault();
+    } else if (e.key === '1') {
+        selectTower('spray', towerButtons[0]);
+        e.preventDefault();
+    } else if (e.key === '2') {
+        selectTower('trap', towerButtons[1]);
+        e.preventDefault();
+    } else if (e.key === '3') {
+        selectTower('zapper', towerButtons[2]);
+        e.preventDefault();
+    } else if (e.key === '4') {
+        selectTower('poison', towerButtons[3]);
+        e.preventDefault();
+    } else if (e.key === '5') {
+        selectUpgradeMode();
         e.preventDefault();
     }
 });
