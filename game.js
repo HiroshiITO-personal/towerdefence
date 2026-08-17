@@ -561,6 +561,21 @@ document.addEventListener('keydown', e => {
     } else if (e.key === 'ArrowRight') {
         selectNextTower(1);
         e.preventDefault();
+    } else if (e.key === '1') {
+        selectTower('spray', towerButtons[0]);
+        e.preventDefault();
+    } else if (e.key === '2') {
+        selectTower('trap', towerButtons[1]);
+        e.preventDefault();
+    } else if (e.key === '3') {
+        selectTower('zapper', towerButtons[2]);
+        e.preventDefault();
+    } else if (e.key === '4') {
+        selectTower('poison', towerButtons[3]);
+        e.preventDefault();
+    } else if (e.key === '5') {
+        selectUpgradeMode();
+        e.preventDefault();
     }
 });
 
