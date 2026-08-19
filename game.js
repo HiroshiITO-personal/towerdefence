@@ -280,60 +280,70 @@ function updateParticles() {
     }
 }
 
-function gameLoop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    if (state.isPlaying) {
-        if (state.isWaveActive) {
-            state.waveTimer--;
-            if (state.waveTimer <= 0 && state.waveQueue.length > 0) {
-                const enemyData = state.waveQueue.shift();
-                state.enemies.push(new Enemy(enemyData.idx, state.wave, enemyData.isBoss));
-                state.waveTimer = enemyData.isBoss ? 200 : Math.max(40, 55 - state.wave * 4);
-            } else if (state.waveQueue.length === 0 && state.enemies.length === 0) {
-                endWave();
-            }
-        }
-        state.towers.forEach(t => t.update());
-        for (let i = state.enemies.length - 1; i >= 0; i--) {
-            const enemy = state.enemies[i];
-            const status = enemy.update();
-            if (status === 'finished') {
-                state.lives -= enemy.isBoss ? 5 : 1;
-                state.enemies.splice(i, 1);
-                updateUI();
-                createParticles(enemy.x, enemy.y, '#fc8181', 15);
-                if (state.lives <= 0) gameOver();
-            } else if (enemy.hp <= 0) {
-                state.money += enemy.reward;
-                state.enemies.splice(i, 1);
-                updateUI();
-                createParticles(enemy.x, enemy.y, '#68d391', 10);
-            }
-        }
-        for (let i = state.projectiles.length - 1; i >= 0; i--) {
-            const p = state.projectiles[i];
-            if (p.type.id === 'spray' || p.type.id === 'trap') {
-                const speed = p.type.id === 'spray' ? 9 : 7;
-                const dx = p.target.x - p.x;
-                const dy = p.target.y - p.y;
-                const dist = Math.hypot(dx, dy);
-                if (dist < speed) {
-                    p.target.hp -= p.type.damage;
-                    if (p.type.id === 'trap') p.target.frozenTimer = 60;
-                    state.projectiles.splice(i, 1);
-                } else {
-                    p.x += (dx / dist) * speed;
-                    p.y += (dy / dist) * speed;
-                }
-            } else if (p.type.id === 'zapper') {
-                state.projectiles.splice(i, 1);
-            }
-        }
-        updateParticles();
-    }
-    draw();
+let lastTime = 0;
+const FPS = 60;
+const frameInterval = 1000 / FPS;
+
+function gameLoop(currentTime) {
     requestAnimationFrame(gameLoop);
+    if (!currentTime) currentTime = performance.now();    
+    const deltaTime = currentTime - lastTime;
+
+    if (deltaTime >= frameInterval) {
+        lastTime = currentTime - (deltaTime % frameInterval);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (state.isPlaying) {
+            if (state.isWaveActive) {
+                state.waveTimer--;
+                if (state.waveTimer <= 0 && state.waveQueue.length > 0) {
+                    const enemyData = state.waveQueue.shift();
+                    state.enemies.push(new Enemy(enemyData.idx, state.wave, enemyData.isBoss));
+                    state.waveTimer = enemyData.isBoss ? 200 : Math.max(40, 55 - state.wave * 4);
+                } else if (state.waveQueue.length === 0 && state.enemies.length === 0) {
+                    endWave();
+                }
+            }
+            state.towers.forEach(t => t.update());
+            for (let i = state.enemies.length - 1; i >= 0; i--) {
+                const enemy = state.enemies[i];
+                const status = enemy.update();
+                if (status === 'finished') {
+                    state.lives -= enemy.isBoss ? 5 : 1;
+                    state.enemies.splice(i, 1);
+                    updateUI();
+                    createParticles(enemy.x, enemy.y, '#fc8181', 15);
+                    if (state.lives <= 0) gameOver();
+                } else if (enemy.hp <= 0) {
+                    state.money += enemy.reward;
+                    state.enemies.splice(i, 1);
+                    updateUI();
+                    createParticles(enemy.x, enemy.y, '#68d391', 10);
+                }
+            }
+            for (let i = state.projectiles.length - 1; i >= 0; i--) {
+                const p = state.projectiles[i];
+                if (p.type.id === 'spray' || p.type.id === 'trap') {
+                    const speed = p.type.id === 'spray' ? 9 : 7;
+                    const dx = p.target.x - p.x;
+                    const dy = p.target.y - p.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist < speed) {
+                        p.target.hp -= p.type.damage;
+                        if (p.type.id === 'trap') p.target.frozenTimer = 60;
+                        state.projectiles.splice(i, 1);
+                    } else {
+                        p.x += (dx / dist) * speed;
+                        p.y += (dy / dist) * speed;
+                    }
+                } else if (p.type.id === 'zapper') {
+                    state.projectiles.splice(i, 1);
+                }
+            }
+            updateParticles();
+        }
+        draw();
+    }
 }
 
 function draw() {
