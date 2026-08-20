@@ -330,7 +330,10 @@ function gameLoop(currentTime) {
                     const dist = Math.hypot(dx, dy);
                     if (dist < speed) {
                         p.target.hp -= p.type.damage;
-                        if (p.type.id === 'trap') p.target.frozenTimer = 60;
+                        if (p.type.id === 'trap') {
+                            p.target.frozenTimer = 60;
+                            p.target.frozenSpeedMultiplier = p.tower.getSlowMultiplier(p.target.isBoss);
+                        }
                         state.projectiles.splice(i, 1);
                     } else {
                         p.x += (dx / dist) * speed;
@@ -702,14 +705,16 @@ class Enemy {
         this.hp = this.maxHp;
         this.baseSpeed = this.speed;
         this.frozenTimer = 0;
+        this.frozenSpeedMultiplier = 1;
     }
 
     update() {
         if (this.frozenTimer > 0) {
             this.frozenTimer--;
-            this.speed = this.baseSpeed * (this.isBoss ? 0.7 : 0.4);
+            this.speed = this.baseSpeed * this.frozenSpeedMultiplier;
         } else {
             this.speed = this.baseSpeed;
+            this.frozenSpeedMultiplier = 1;
         }
         const tx = this.targetC * CONFIG.tileSize + CONFIG.tileSize / 2;
         const ty = this.targetR * CONFIG.tileSize + CONFIG.tileSize / 2;
@@ -810,6 +815,11 @@ class Tower {
         return this.type.range * CONFIG.tileSize * (1 + (this.level - 1) * 0.1);
     }
 
+    getSlowMultiplier(isBoss) {
+        const baseMultiplier = isBoss ? 0.7 : this.type.slow;
+        return Math.max(0.2, baseMultiplier - (this.level - 1) * 0.05);
+    }
+
     update() {
         if (this.cooldown > 0) this.cooldown--;
         const range = this.getRange();
@@ -839,7 +849,7 @@ class Tower {
                 createParticles(target.x, target.y, '#f6e05e', 5);
             }
         } else if (this.type.id === 'trap') {
-            state.projectiles.push({x: this.x, y: this.y, target, type: this.type, active: true, speed: 6});
+            state.projectiles.push({x: this.x, y: this.y, target, tower: this, type: this.type, active: true, speed: 6});
             playSfx(this.type.id);
         } else if (this.type.id === 'poison') {
             playSfx(this.type.id);
