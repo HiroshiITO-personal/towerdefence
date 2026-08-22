@@ -7,7 +7,7 @@ const CONFIG = {
     baseEnemyHp: 44,
     moneyPerKill: 6,
     bossWaveInterval: 5,
-    upgradeCostShield: 1.5,
+    upgradeCostShield: 0.9,
     maxTowerLevel: 5
 };
 
@@ -43,8 +43,14 @@ const state = {
     particles: [],
     waveQueue: [],
     waveTimer: 0,
-    bossComing: false
+    bossComing: false,
+    shakeTimer: 0
 };
+
+function triggerShake(frames = 30) {
+    state.shakeTimer = frames;
+}
+
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -104,8 +110,10 @@ function ensureAudio() {
         }
         audio.distCurve = curve;
     }
-    if (audio.ctx.state === 'suspended') {
-        audio.ctx.resume();
+    if (audio.ctx.state !== 'running') {
+        audio.ctx.resume().catch(() => {
+            audio.unlocked = false;
+        });
     }
     return audio.ctx;
 }
@@ -447,6 +455,14 @@ function gameLoop(currentTime) {
 }
 
 function draw() {
+    ctx.save();
+    if (state.shakeTimer > 0) {
+        const intensity = 7; // 揺れの強さ（ピクセル数）
+        const dx = (Math.random() - 0.5) * intensity;
+        const dy = (Math.random() - 0.5) * intensity;
+        ctx.translate(dx, dy);
+        state.shakeTimer--;
+    }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (let r = 0; r < CONFIG.rows; r++) {
         for (let c = 0; c < CONFIG.cols; c++) {
@@ -502,6 +518,7 @@ function draw() {
         ctx.fillRect(p.x, p.y, 4, 4);
         ctx.globalAlpha = 1.0;
     }
+    ctx.restore();
 }
 
 function startWave() {
@@ -533,6 +550,7 @@ function startWave() {
 }
 
 function showBossWarning() {
+    triggerShake(20);
     bossWarning.style.opacity = 1;
     bossWarning.style.transform = 'translate(-50%, -50%) scale(1.2)';
     setTimeout(() => {
@@ -692,7 +710,11 @@ document.addEventListener('keydown', e => {
 window.addEventListener('pointerdown', () => {
     unlockAudio();
     startBGM();
-}, {once: true});
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && audio.ctx) ensureAudio();
+});
 
 function selectNextTower(direction) {
     const towerKeys = Object.keys(TOWERS);
@@ -949,7 +971,6 @@ class Tower {
             state.projectiles.push({x: this.x, y: this.y, target, tower: this, type: this.type, active: true, speed: 6});
             playSfx(this.type.id);
         } else if (this.type.id === 'poison') {
-            playSfx(this.type.id);
             for (const enemy of state.enemies) {
                 const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
                 if (dist <= this.type.range * CONFIG.tileSize) {
