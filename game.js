@@ -169,7 +169,7 @@ function playHarp(freq, duration = 1.2, volume = 0.08, delay = 0) {
 
 let activeSoundCount = 0;
 
-function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', delay = 0, targetFreq = null, sendFx = true) {
+function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', delay = 0, targetFreq = null, sendFx = true, attack = 0.015) {
     if (!audio.ctx || !audio.master) return;
     if (activeSoundCount > 16) return;
     const t = audio.ctx.currentTime + delay;
@@ -182,7 +182,6 @@ function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', del
         osc.frequency.exponentialRampToValueAtTime(Math.max(10, targetFreq), t + duration);
     }
     
-    const attack = 0.015;
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(volume, t + attack);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
@@ -193,6 +192,10 @@ function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', del
     osc.start(t);
     osc.stop(t + duration + 0.05);
     osc.onended = () => { activeSoundCount = Math.max(0, activeSoundCount - 1); };
+}
+
+function playBGM(freq, duration, volume, type = 'triangle', delay = 0) {
+    playTone(freq, duration, volume, type, delay, null, false, 0.08);
 }
 
 function playNoise(duration = 0.1, volume = 0.05, cutoff = 1000, delay = 0) {
@@ -242,29 +245,19 @@ function playSfx(kind) {
         const osc = audio.ctx.createOscillator();
         const shaper = audio.ctx.createWaveShaper();
         const gain = audio.ctx.createGain();
-
         shaper.curve = audio.distCurve;
         osc.type = 'sawtooth';
-        
         osc.frequency.setValueAtTime(300, now);
         osc.frequency.exponentialRampToValueAtTime(1800, now + 0.1);
         osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
-
         gain.gain.setValueAtTime(0.08, now);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-
         osc.connect(shaper);
         shaper.connect(gain);
         gain.connect(audio.fxBus || audio.master);
-
         osc.start(now);
         osc.stop(now + 0.36);
-
         playNoise(0.25, 0.1, 300, 0.05);
-    } else if (kind === 'poison') {
-        playNoise(0.3, 0.06, 1800);
-        playTone(659.25, 0.25, 0.03, 'sine', 0, 622.25);
-        playTone(932.33, 0.25, 0.02, 'sine', 0.04);
     } else if (kind === 'lose') {
         playTone(110, 0.7, 0.12, 'sawtooth', 0, 45);
         playTone(155.56, 0.6, 0.08, 'square', 0.05, 50);
@@ -298,14 +291,14 @@ function startBGM() {
         const droneNote = drone[step];
 
         if (melodyNote > 0) {
-            playTone(melodyNote, 0.75, 0.10, 'sine');
-            playTone(melodyNote, 0.70, 0.05, 'triangle', 0.01);
-            playTone(melodyNote * 2, 0.60, 0.02, 'sine', 0.03);
+            playBGM(melodyNote, 0.75, 0.15, 'sine');
+            playBGM(melodyNote, 0.70, 0.06, 'triangle', 0.01);
+            playBGM(melodyNote * 2, 0.60, 0.025, 'sine', 0.03);
         }
 
         if (droneNote > 0) {
-            playTone(droneNote, 0.8, 0.12, 'triangle');
-            playTone(droneNote / 2, 0.85, 0.08, 'sine');
+            playBGM(droneNote, 0.8, 0.14, 'triangle');
+            playBGM(droneNote / 2, 0.85, 0.09, 'sine');
         }
     }, 460);
 }
