@@ -66,7 +66,7 @@ const modalBtn = document.getElementById('modal-btn');
 const bossWarning = document.getElementById('boss-warning');
 const towerButtons = [];
 
-const audio = {ctx: null,master: null,fxBus: null,noiseBuffer: null,distCurve: null,bgmTimer: null,unlocked: false};
+const audio = {ctx: null,master: null,fxBus: null,noiseBuffer: null,distCurve: null,bgmTimer: null,bgmStep: 0,unlocked: false};
 
 function ensureAudio() {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -277,31 +277,37 @@ function playSfx(kind) {
 function startBGM() {
     const ctx = ensureAudio();
     if (!ctx || audio.bgmTimer) return;
-    unlockAudio();
-
-    const harpNotes = [
-        [146.83, 220.00, 293.66, 349.23], // D3, A3, D4, F4
-        [146.83, 220.00, 293.66, 370.00], // D3, A3, D4, F#4
-        [138.59, 207.65, 277.18, 329.63], // C#3, G#3, C#4, E4
-        [130.81, 196.00, 261.63, 311.13]  // C3, G3, C4, Eb4
+    const melody = [
+        293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66, 261.63,
+        293.66, 349.23, 440.00, 523.25, 440.00, 392.00, 349.23, 392.00,
+        440.00, 466.16, 440.00, 392.00, 349.23, 329.63, 293.66, 329.63,
+        349.23, 392.00, 329.63, 293.66, 293.66, 0, 293.66, 0
     ];
 
-    let step = 0;
+    const drone = [
+        146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 130.81,
+        146.83, 174.61, 220.00, 220.00, 220.00, 196.00, 174.61, 196.00,
+        220.00, 233.08, 220.00, 196.00, 174.61, 146.83, 146.83, 164.81,
+        174.61, 196.00, 164.81, 146.83, 146.83, 0, 146.83, 0
+    ];
+
     audio.bgmTimer = setInterval(() => {
         if (!state.isPlaying) return;
+        const step = audio.bgmStep++ % melody.length;
+        const melodyNote = melody[step];
+        const droneNote = drone[step];
 
-        const measure = Math.floor(step / 4) % harpNotes.length;
-        const harpPattern = harpNotes[measure];
-        
-        const harpFreq = harpPattern[step % 4];
-        playHarp(harpFreq, 1.4, 0.08, 0);
-
-        if (step % 2 === 0) {
-            playHarp(harpFreq * 2, 0.8, 0.035, 0.15);
+        if (melodyNote > 0) {
+            playTone(melodyNote, 0.75, 0.10, 'sine');
+            playTone(melodyNote, 0.70, 0.05, 'triangle', 0.01);
+            playTone(melodyNote * 2, 0.60, 0.02, 'sine', 0.03);
         }
 
-        step++;
-    }, 450); 
+        if (droneNote > 0) {
+            playTone(droneNote, 0.8, 0.12, 'triangle');
+            playTone(droneNote / 2, 0.85, 0.08, 'sine');
+        }
+    }, 460);
 }
 
 function stopBGM() {
