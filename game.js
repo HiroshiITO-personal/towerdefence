@@ -61,7 +61,7 @@ const modalBtn = document.getElementById('modal-btn');
 const bossWarning = document.getElementById('boss-warning');
 const towerButtons = [];
 
-const audio = {ctx: null, master: null, bgmTimer: null, bgmStep: 0, unlocked: false};
+const audio = {ctx: null,master: null,fxBus: null,noiseBuffer: null,distCurve: null,bgmTimer: null,bgmStep: 0,unlocked: false};
 
 function ensureAudio() {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -70,7 +70,39 @@ function ensureAudio() {
         audio.ctx = new AudioCtx();
         audio.master = audio.ctx.createGain();
         audio.master.gain.value = 0.22;
+
+        const delay = audio.ctx.createDelay();
+        const feedback = audio.ctx.createGain();
+        const filter = audio.ctx.createBiquadFilter();
+
+        delay.delayTime.value = 0.28;
+        feedback.gain.value = 0.45;
+        filter.type = 'lowpass';
+        filter.frequency.value = 1500;
+
+        audio.fxBus = audio.ctx.createGain();
+        audio.fxBus.connect(audio.master);
+        audio.fxBus.connect(delay);
+        delay.connect(filter);
+        filter.connect(feedback);
+        feedback.connect(delay);
+        filter.connect(audio.master);
+
         audio.master.connect(audio.ctx.destination);
+
+        const bufferSize = audio.ctx.sampleRate * 2;
+        audio.noiseBuffer = audio.ctx.createBuffer(1, bufferSize, audio.ctx.sampleRate);
+        const data = audio.noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+
+        const k = 25, n = 44100, curve = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            const x = (i * 2) / n - 1;
+            curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x));
+        }
+        audio.distCurve = curve;
     }
     if (audio.ctx.state === 'suspended') {
         audio.ctx.resume();
@@ -95,68 +127,141 @@ function unlockAudio() {
     osc.stop(ctx.currentTime + 0.09);
 }
 
+function playHarp(freq, duration = 1.2, volume = 0.08, delay = 0) {
+    if (!audio.ctx || !audio.master) return;
+    const t = audio.ctx.currentTime + delay;
+    
+    const osc1 = audio.ctx.createOscillator();
+    const gain1 = audio.ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(freq, t);
+
+    const osc2 = audio.ctx.createOscillator();
+    const gain2 = audio.ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(freq * 2, t);
+
+    gain1.gain.setValueAtTime(0, t);
+    gain1.gain.linearRampToValueAtTime(volume, t + 0.005);
+    gain1.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    gain2.gain.setValueAtTime(0, t);
+    gain2.gain.linearRampToValueAtTime(volume * 0.4, t + 0.003);
+    gain2.gain.exponentialRampToValueAtTime(0.0001, t + (duration * 0.3));
+
+    osc1.connect(gain1);
+    osc2.connect(gain2);
+    gain1.connect(audio.fxBus || audio.master);
+    gain2.connect(audio.fxBus || audio.master);
+
+    osc1.start(t);
+    osc2.start(t);
+    osc1.stop(t + duration);
+    osc2.stop(t + duration);
+}
+
 let activeSoundCount = 0;
 
-function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', delay = 0) {
+function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', delay = 0, targetFreq = null, sendFx = true) {
     if (!audio.ctx || !audio.master) return;
-    if (activeSoundCount > 12) return;
+    if (activeSoundCount > 16) return;
     const t = audio.ctx.currentTime + delay;
     const osc = audio.ctx.createOscillator();
     const gain = audio.ctx.createGain();   
     osc.type = type;
     osc.frequency.setValueAtTime(freq, t);
-    const attackTime = 0.02;
-    const releaseTime = Math.max(0.05, duration - attackTime);
+    
+    if (targetFreq) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(10, targetFreq), t + duration);
+    }
+    
+    const attack = 0.015;
     gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(volume, t + attackTime);
-    gain.gain.linearRampToValueAtTime(0, t + attackTime + releaseTime);
+    gain.gain.linearRampToValueAtTime(volume, t + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    
     osc.connect(gain);
-    gain.connect(audio.master);
+    gain.connect(sendFx && audio.fxBus ? audio.fxBus : audio.master);
     activeSoundCount++;
     osc.start(t);
     osc.stop(t + duration + 0.05);
-    
-    osc.onended = () => {
-        activeSoundCount = Math.max(0, activeSoundCount - 1);
-    };
+    osc.onended = () => { activeSoundCount = Math.max(0, activeSoundCount - 1); };
+}
+
+function playNoise(duration = 0.1, volume = 0.05, cutoff = 1000, delay = 0) {
+    if (!audio.ctx || !audio.noiseBuffer) return;
+    const t = audio.ctx.currentTime + delay;
+    const noise = audio.ctx.createBufferSource();
+    noise.buffer = audio.noiseBuffer;
+    const filter = audio.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(cutoff, t);
+
+    const gain = audio.ctx.createGain();
+    gain.gain.setValueAtTime(volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(audio.fxBus || audio.master);
+    noise.start(t);
+    noise.stop(t + duration);
 }
 
 function playSfx(kind) {
     if (!audio.ctx) return;
-    const now = audio.ctx.currentTime;
+    
     if (kind === 'build') {
-        playTone(660, 0.08, 0.07, 'triangle');
-        playTone(990, 0.12, 0.05, 'triangle', 0.06);
+        playNoise(0.15, 0.12, 400);
+        playTone(180, 0.12, 0.08, 'sawtooth', 0, 90);
+        playTone(880, 0.08, 0.03, 'triangle', 0.02);
     } else if (kind === 'upgrade') {
-        playTone(520, 0.08, 0.08, 'sawtooth');
-        playTone(780, 0.12, 0.07, 'sawtooth', 0.08);
-        playTone(1040, 0.14, 0.05, 'triangle', 0.14);
+        playTone(523.25, 0.3, 0.06, 'sine');
+        playTone(739.99, 0.35, 0.05, 'sine', 0.03);
+        playTone(1046.50, 0.4, 0.04, 'triangle', 0.06);
+        playTone(2093.00, 0.2, 0.02, 'sine', 0.1);
     } else if (kind === 'wave') {
-        playTone(220, 0.16, 0.08, 'square');
-        playTone(330, 0.18, 0.08, 'square', 0.08);
-        playTone(440, 0.22, 0.08, 'square', 0.16);
+        playTone(146.83, 0.45, 0.1, 'sawtooth', 0, 130.81);
+        playTone(220.00, 0.45, 0.06, 'sawtooth', 0.02, 196.00);
+        playNoise(0.3, 0.05, 800, 0.05);
     } else if (kind === 'spray') {
-        playTone(620, 0.06, 0.05, 'triangle');
-        playTone(780, 0.08, 0.04, 'triangle', 0.04);
+        playNoise(0.12, 0.08, 2500);
+        playTone(880, 0.08, 0.04, 'sine', 0, 1760);
     } else if (kind === 'trap') {
-        playTone(280, 0.09, 0.045, 'square');
-        playTone(220, 0.12, 0.035, 'square', 0.05);
+        playTone(440, 0.22, 0.07, 'sawtooth', 0, 80);
+        playTone(311.13, 0.25, 0.05, 'square', 0.02, 60);
     } else if (kind === 'zapper') {
-        playTone(523.25, 0.12, 0.05, 'sine');
-        playTone(659.25, 0.12, 0.05, 'sine', 0.03);
-        playTone(783.99, 0.12, 0.05, 'sine', 0.06);
-        playTone(1046.50, 0.25, 0.06, 'triangle', 0.09);
-        playTone(1567.98, 0.15, 0.04, 'sine', 0.12);
-        playTone(2093.00, 0.20, 0.03, 'sine', 0.15);
-        playTone(1046.50, 0.18, 0.03, 'sine', 0.20);
-        playTone(1567.98, 0.18, 0.02, 'sine', 0.26);
-        playTone(2093.00, 0.25, 0.01, 'sine', 0.32);
+        const now = audio.ctx.currentTime;
+        const osc = audio.ctx.createOscillator();
+        const shaper = audio.ctx.createWaveShaper();
+        const gain = audio.ctx.createGain();
+
+        shaper.curve = audio.distCurve;
+        osc.type = 'sawtooth';
+        
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(1800, now + 0.1);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+        osc.connect(shaper);
+        shaper.connect(gain);
+        gain.connect(audio.fxBus || audio.master);
+
+        osc.start(now);
+        osc.stop(now + 0.36);
+
+        playNoise(0.25, 0.1, 300, 0.05);
     } else if (kind === 'poison') {
-        playTone(220, 0.1, 0.05, 'sine');
-        playTone(160, 0.14, 0.04, 'sine', 0.04);
+        playNoise(0.3, 0.06, 1800);
+        playTone(659.25, 0.25, 0.03, 'sine', 0, 622.25);
+        playTone(932.33, 0.25, 0.02, 'sine', 0.04);
     } else if (kind === 'lose') {
-        playTone(180, 0.24, 0.08, 'sawtooth');
-        playTone(140, 0.38, 0.08, 'sawtooth', 0.12);
+        playTone(110, 0.7, 0.12, 'sawtooth', 0, 45);
+        playTone(155.56, 0.6, 0.08, 'square', 0.05, 50);
+        playNoise(0.5, 0.08, 200, 0.1);
     } else {
         playTone(440, 0.08, 0.05, 'triangle');
     }
@@ -166,40 +271,31 @@ function startBGM() {
     const ctx = ensureAudio();
     if (!ctx || audio.bgmTimer) return;
     unlockAudio();
-    const melody = [
-        293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66, 261.63,
-        293.66, 349.23, 440.00, 523.25, 440.00, 392.00, 349.23, 392.00,
-        440.00, 466.16, 440.00, 392.00, 349.23, 329.63, 293.66, 329.63,
-        349.23, 392.00, 329.63, 293.66, 293.66,      0, 293.66,      0
+
+    const harpNotes = [
+        [146.83, 220.00, 293.66, 349.23], // D3, A3, D4, F4
+        [146.83, 220.00, 293.66, 370.00], // D3, A3, D4, F#4
+        [138.59, 207.65, 277.18, 329.63], // C#3, G#3, C#4, E4
+        [130.81, 196.00, 261.63, 311.13]  // C3, G3, C4, Eb4
     ];
 
-    const drone = [
-        146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 130.81,
-        146.83, 174.61, 220.00, 220.00, 220.00, 196.00, 174.61, 196.00,
-        220.00, 233.08, 220.00, 196.00, 174.61, 146.83, 146.83, 164.81,
-        174.61, 196.00, 164.81, 146.83, 146.83,      0, 146.83,      0
-    ];
-    
+    let step = 0;
     audio.bgmTimer = setInterval(() => {
         if (!state.isPlaying) return;
-        const step = audio.bgmStep++ % melody.length;
+
+        const measure = Math.floor(step / 4) % harpNotes.length;
+        const harpPattern = harpNotes[measure];
         
-        const mNote = melody[step];
-        const dNote = drone[step];
+        const harpFreq = harpPattern[step % 4];
+        playHarp(harpFreq, 1.4, 0.08, 0);
 
-        if (mNote > 0) {
-            playTone(mNote, 0.75, 0.10, 'sine');
-            playTone(mNote, 0.70, 0.05, 'triangle', 0.01);
-            playTone(mNote * 2, 0.60, 0.02, 'sine', 0.03);
+        if (step % 2 === 0) {
+            playHarp(harpFreq * 2, 0.8, 0.035, 0.15);
         }
 
-        if (dNote > 0) {
-            playTone(dNote, 0.8, 0.12, 'triangle');
-            playTone(dNote / 2, 0.85, 0.08, 'sine');
-        }
-    }, 460); 
+        step++;
+    }, 450); 
 }
-
 
 function stopBGM() {
     if (audio.bgmTimer) {
@@ -316,6 +412,7 @@ function gameLoop(currentTime) {
                     if (state.lives <= 0) gameOver();
                 } else if (enemy.hp <= 0) {
                     state.money += enemy.reward;
+                    if (enemy.isBoss) state.lives += 1;
                     state.enemies.splice(i, 1);
                     updateUI();
                     createParticles(enemy.x, enemy.y, '#68d391', 10);
