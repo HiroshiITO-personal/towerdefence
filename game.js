@@ -43,7 +43,6 @@ const state = {
     particles: [],
     waveQueue: [],
     waveTimer: 0,
-    bossComing: false,
     shakeTimer: 0
 };
 
@@ -278,31 +277,37 @@ function playSfx(kind) {
 function startBGM() {
     const ctx = ensureAudio();
     if (!ctx || audio.bgmTimer) return;
-    unlockAudio();
-
-    const harpNotes = [
-        [146.83, 220.00, 293.66, 349.23], // D3, A3, D4, F4
-        [146.83, 220.00, 293.66, 370.00], // D3, A3, D4, F#4
-        [138.59, 207.65, 277.18, 329.63], // C#3, G#3, C#4, E4
-        [130.81, 196.00, 261.63, 311.13]  // C3, G3, C4, Eb4
+    const melody = [
+        293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66, 261.63,
+        293.66, 349.23, 440.00, 523.25, 440.00, 392.00, 349.23, 392.00,
+        440.00, 466.16, 440.00, 392.00, 349.23, 329.63, 293.66, 329.63,
+        349.23, 392.00, 329.63, 293.66, 293.66, 0, 293.66, 0
     ];
 
-    let step = 0;
+    const drone = [
+        146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 130.81,
+        146.83, 174.61, 220.00, 220.00, 220.00, 196.00, 174.61, 196.00,
+        220.00, 233.08, 220.00, 196.00, 174.61, 146.83, 146.83, 164.81,
+        174.61, 196.00, 164.81, 146.83, 146.83, 0, 146.83, 0
+    ];
+
     audio.bgmTimer = setInterval(() => {
         if (!state.isPlaying) return;
+        const step = audio.bgmStep++ % melody.length;
+        const melodyNote = melody[step];
+        const droneNote = drone[step];
 
-        const measure = Math.floor(step / 4) % harpNotes.length;
-        const harpPattern = harpNotes[measure];
-        
-        const harpFreq = harpPattern[step % 4];
-        playHarp(harpFreq, 1.4, 0.08, 0);
-
-        if (step % 2 === 0) {
-            playHarp(harpFreq * 2, 0.8, 0.035, 0.15);
+        if (melodyNote > 0) {
+            playTone(melodyNote, 0.75, 0.10, 'sine');
+            playTone(melodyNote, 0.70, 0.05, 'triangle', 0.01);
+            playTone(melodyNote * 2, 0.60, 0.02, 'sine', 0.03);
         }
 
-        step++;
-    }, 450); 
+        if (droneNote > 0) {
+            playTone(droneNote, 0.8, 0.12, 'triangle');
+            playTone(droneNote / 2, 0.85, 0.08, 'sine');
+        }
+    }, 460);
 }
 
 function stopBGM() {
@@ -312,33 +317,7 @@ function stopBGM() {
     }
 }
 
-function resizeCanvas() {
-    const container = document.getElementById('game-container');
-    const maxWidth = window.innerWidth - 20;
-    const maxHeight = window.innerHeight - 200;
-    const aspectRatio = CONFIG.cols / CONFIG.rows;
-    
-    let displayWidth = maxWidth;
-    let displayHeight = maxWidth / aspectRatio;
-    
-    if (displayHeight > maxHeight) {
-        displayHeight = maxHeight;
-        displayWidth = displayHeight * aspectRatio;
-    }
-    
-    state.canvasDisplayWidth = displayWidth;
-    state.canvasDisplayHeight = displayHeight;
-    state.scale = displayWidth / (CONFIG.cols * CONFIG.tileSize);
-    
-    canvas.width = CONFIG.cols * CONFIG.tileSize;
-    canvas.height = CONFIG.rows * CONFIG.tileSize;
-    container.style.width = displayWidth + 'px';
-    container.style.height = displayHeight + 'px';
-}
-
 function init() {
-    state.canvas = canvas;
-    state.ctx = ctx;
     canvas.width = CONFIG.cols * CONFIG.tileSize;
     canvas.height = CONFIG.rows * CONFIG.tileSize;
     generateMap();
@@ -360,7 +339,6 @@ function resetGame() {
     state.particles = [];
     state.waveQueue = [];
     state.isPlaying = true;
-    state.bossComing = false;
     updateUI();
     modalOverlay.style.display = 'none';
     waveBtn.disabled = false;
@@ -961,14 +939,14 @@ class Tower {
 
     fire(target) {
         if (this.type.id === 'spray' || this.type.id === 'zapper') {
-            state.projectiles.push({x: this.x, y: this.y, tx: target.x, ty: target.y, target, type: this.type, active: true});
+            state.projectiles.push({x: this.x, y: this.y, tx: target.x, ty: target.y, target, type: this.type});
             playSfx(this.type.id);
             if (this.type.id === 'zapper') {
                 target.hp -= this.type.damage;
                 createParticles(target.x, target.y, '#f6e05e', 5);
             }
         } else if (this.type.id === 'trap') {
-            state.projectiles.push({x: this.x, y: this.y, target, tower: this, type: this.type, active: true, speed: 6});
+            state.projectiles.push({x: this.x, y: this.y, target, tower: this, type: this.type});
             playSfx(this.type.id);
         } else if (this.type.id === 'poison') {
             for (const enemy of state.enemies) {
