@@ -43,7 +43,6 @@ const state = {
     particles: [],
     waveQueue: [],
     waveTimer: 0,
-    bossComing: false,
     shakeTimer: 0
 };
 
@@ -67,7 +66,7 @@ const modalBtn = document.getElementById('modal-btn');
 const bossWarning = document.getElementById('boss-warning');
 const towerButtons = [];
 
-const audio = {ctx: null,master: null,fxBus: null,noiseBuffer: null,distCurve: null,bgmTimer: null,bgmStep: 0,unlocked: false};
+const audio = {ctx: null,master: null,fxBus: null,noiseBuffer: null,distCurve: null,bgmTimer: null,unlocked: false};
 
 function ensureAudio() {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -312,33 +311,7 @@ function stopBGM() {
     }
 }
 
-function resizeCanvas() {
-    const container = document.getElementById('game-container');
-    const maxWidth = window.innerWidth - 20;
-    const maxHeight = window.innerHeight - 200;
-    const aspectRatio = CONFIG.cols / CONFIG.rows;
-    
-    let displayWidth = maxWidth;
-    let displayHeight = maxWidth / aspectRatio;
-    
-    if (displayHeight > maxHeight) {
-        displayHeight = maxHeight;
-        displayWidth = displayHeight * aspectRatio;
-    }
-    
-    state.canvasDisplayWidth = displayWidth;
-    state.canvasDisplayHeight = displayHeight;
-    state.scale = displayWidth / (CONFIG.cols * CONFIG.tileSize);
-    
-    canvas.width = CONFIG.cols * CONFIG.tileSize;
-    canvas.height = CONFIG.rows * CONFIG.tileSize;
-    container.style.width = displayWidth + 'px';
-    container.style.height = displayHeight + 'px';
-}
-
 function init() {
-    state.canvas = canvas;
-    state.ctx = ctx;
     canvas.width = CONFIG.cols * CONFIG.tileSize;
     canvas.height = CONFIG.rows * CONFIG.tileSize;
     generateMap();
@@ -360,7 +333,6 @@ function resetGame() {
     state.particles = [];
     state.waveQueue = [];
     state.isPlaying = true;
-    state.bossComing = false;
     updateUI();
     modalOverlay.style.display = 'none';
     waveBtn.disabled = false;
@@ -961,14 +933,14 @@ class Tower {
 
     fire(target) {
         if (this.type.id === 'spray' || this.type.id === 'zapper') {
-            state.projectiles.push({x: this.x, y: this.y, tx: target.x, ty: target.y, target, type: this.type, active: true});
+            state.projectiles.push({x: this.x, y: this.y, tx: target.x, ty: target.y, target, type: this.type});
             playSfx(this.type.id);
             if (this.type.id === 'zapper') {
                 target.hp -= this.type.damage;
                 createParticles(target.x, target.y, '#f6e05e', 5);
             }
         } else if (this.type.id === 'trap') {
-            state.projectiles.push({x: this.x, y: this.y, target, tower: this, type: this.type, active: true, speed: 6});
+            state.projectiles.push({x: this.x, y: this.y, target, tower: this, type: this.type});
             playSfx(this.type.id);
         } else if (this.type.id === 'poison') {
             for (const enemy of state.enemies) {

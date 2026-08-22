@@ -3,14 +3,10 @@
             --bg-2: #dff7ff;
             --bg-3: #fdf4c8;
             --panel: rgba(255, 255, 255, 0.72);
-            --panel-strong: rgba(255, 255, 255, 0.9);
             --text-color: #4a2d5d;
             --accent-color: #ff7ac6;
             --accent-2: #8b5cf6;
             --accent-3: #38bdf8;
-            --danger-color: #ff6b9b;
-            --success-color: #5eead4;
-            --shadow: rgba(176, 105, 255, 0.25);
         }
 
         body {
