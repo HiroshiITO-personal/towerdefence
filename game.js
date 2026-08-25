@@ -74,7 +74,7 @@ function ensureAudio() {
     if (!audio.ctx) {
         audio.ctx = new AudioCtx();
         audio.master = audio.ctx.createGain();
-        audio.master.gain.value = 0.22;
+        audio.master.gain.value = 0.45;
 
         const delay = audio.ctx.createDelay();
         const feedback = audio.ctx.createGain();
@@ -86,6 +86,8 @@ function ensureAudio() {
         filter.frequency.value = 1500;
 
         audio.fxBus = audio.ctx.createGain();
+        audio.fxBus.gain.value = 0.25;
+
         audio.fxBus.connect(audio.master);
         audio.fxBus.connect(delay);
         delay.connect(filter);
@@ -235,29 +237,25 @@ function playSfx(kind) {
         playTone(220.00, 0.45, 0.06, 'sawtooth', 0.02, 196.00);
         playNoise(0.3, 0.05, 800, 0.05);
     } else if (kind === 'spray') {
-        playNoise(0.12, 0.08, 2500);
-        playTone(880, 0.08, 0.04, 'sine', 0, 1760);
+        const now = audio.ctx.currentTime;
+        playTone(587.33, 0.15, 0.09, 'sawtooth', 0, 1174.66, true, 0.005);
+        playTone(1174.66, 0.18, 0.07, 'sine', 0.01, 2349.32, true, 0.003);
+        playTone(293.66, 0.14, 0.08, 'triangle', 0, 146.83, true, 0.005);
+        playNoise(0.15, 0.07, 3500, 0);
     } else if (kind === 'trap') {
-        playTone(440, 0.22, 0.07, 'sawtooth', 0, 80);
-        playTone(311.13, 0.25, 0.05, 'square', 0.02, 60);
+        playTone(440, 0.22, 0.05, 'sawtooth', 0, 80);
+        playTone(311.13, 0.25, 0.02, 'square', 0.02, 60);
     } else if (kind === 'zapper') {
         const now = audio.ctx.currentTime;
-        const osc = audio.ctx.createOscillator();
-        const shaper = audio.ctx.createWaveShaper();
-        const gain = audio.ctx.createGain();
-        shaper.curve = audio.distCurve;
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(1800, now + 0.1);
-        osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
-        gain.gain.setValueAtTime(0.08, now);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-        osc.connect(shaper);
-        shaper.connect(gain);
-        gain.connect(audio.fxBus || audio.master);
-        osc.start(now);
-        osc.stop(now + 0.36);
-        playNoise(0.25, 0.1, 300, 0.05);
+        const rainbowFreqs = [1046.50, 1318.51, 1567.98, 2093.00, 2637.02, 3135.96];
+        rainbowFreqs.forEach((freq, index) => {
+            const delay = index * 0.025;
+            playTone(freq, 0.28, 0.06, 'sawtooth', delay, freq * 1.08, true, 0.002);
+            playTone(freq * 1.5, 0.20, 0.04, 'sine', delay + 0.005, null, true, 0.001);
+            playTone(freq * 2.0, 0.15, 0.03, 'triangle', delay + 0.01, null, true, 0.001);
+        });
+        playTone(261.63, 0.18, 0.08, 'sine', 0, 130.81, true, 0.005);
+        playNoise(0.25, 0.04, 8000, 0);
     } else if (kind === 'lose') {
         playTone(110, 0.7, 0.12, 'sawtooth', 0, 45);
         playTone(155.56, 0.6, 0.08, 'square', 0.05, 50);
