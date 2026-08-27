@@ -11,6 +11,9 @@ const CONFIG = {
     maxTowerLevel: 5
 };
 
+const SAVE_VERSION = 1;
+const MAX_SAVE_JSON_LENGTH = 1000000;
+
 const TOWERS = {
     spray: {id: 'spray', name: 'Sparkle', icon: '🦄', cost: 60, range: 3.5, damage: 20, cooldown: 15, color: '#ff7ac6', desc: 'Bright magical beams.'},
     trap: {id: 'trap', name: 'Star Trap', icon: '✨', cost: 90, range: 2.2, damage: 10, slow: 0.4, cooldown: 8, color: '#fbbf24', desc: 'Slows rainbow invaders.'},
@@ -265,38 +268,28 @@ function playSfx(kind) {
     }
 }
 
+const BGM_NOTES = [0,130.81,146.83,164.81,174.61,196.00,220.00,233.08,261.63,293.66,329.63,349.23,392.00,440.00,466.16,523.25];
+
 function startBGM() {
     const ctx = ensureAudio();
     if (!ctx || audio.bgmTimer) return;
-    const melody = [
-        293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66, 261.63,
-        293.66, 349.23, 440.00, 523.25, 440.00, 392.00, 349.23, 392.00,
-        440.00, 466.16, 440.00, 392.00, 349.23, 329.63, 293.66, 329.63,
-        349.23, 392.00, 329.63, 293.66, 293.66, 0, 293.66, 0
-    ];
+    const melody = [9, 10, 11, 12, 11, 10, 9, 8,9, 11, 13, 15, 13, 12, 11, 12,13, 14, 13, 12, 11, 10, 9, 10,11, 12, 10, 9, 9, 0, 9, 0];
 
-    const drone = [
-        146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 146.83, 130.81,
-        146.83, 174.61, 220.00, 220.00, 220.00, 196.00, 174.61, 196.00,
-        220.00, 233.08, 220.00, 196.00, 174.61, 146.83, 146.83, 164.81,
-        174.61, 196.00, 164.81, 146.83, 146.83, 0, 146.83, 0
-    ];
+    const drone = [2, 2, 2, 2, 2, 2, 2, 1,2, 4, 6, 6, 6, 5, 4, 5,6, 7, 6, 5, 4, 2, 2, 3,4, 5, 3, 2, 2, 0, 2, 0];
 
     audio.bgmTimer = setInterval(() => {
         if (!state.isPlaying) return;
         const step = audio.bgmStep++ % melody.length;
-        const melodyNote = melody[step];
-        const droneNote = drone[step];
-
-        if (melodyNote > 0) {
-            playBGM(melodyNote, 0.75, 0.15, 'sine');
-            playBGM(melodyNote, 0.70, 0.06, 'triangle', 0.01);
-            playBGM(melodyNote * 2, 0.60, 0.025, 'sine', 0.03);
+        const mFreq = BGM_NOTES[melody[step]];
+        const dFreq = BGM_NOTES[drone[step]];
+        if (mFreq) {
+            playBGM(mFreq, 0.75, 0.35, 'sine');
+            playBGM(mFreq, 0.70, 0.15, 'triangle', 0.01);
+            playBGM(mFreq * 2, 0.60, 0.08, 'sine', 0.03);
         }
-
-        if (droneNote > 0) {
-            playBGM(droneNote, 0.8, 0.14, 'triangle');
-            playBGM(droneNote / 2, 0.85, 0.09, 'sine');
+        if (dFreq) {
+            playBGM(dFreq, 0.8, 0.30, 'triangle');
+            playBGM(dFreq / 2, 0.85, 0.20, 'sine');
         }
     }, 460);
 }
@@ -309,12 +302,22 @@ function stopBGM() {
 }
 
 function init() {
-    canvas.width = CONFIG.cols * CONFIG.tileSize;
-    canvas.height = CONFIG.rows * CONFIG.tileSize;
+    resizeCanvas();
     generateMap();
     setupUI();
     resetGame();
-    requestAnimationFrame(gameLoop);
+    startGameLoop();
+}
+
+function resizeCanvas() {
+    canvas.width = CONFIG.cols * CONFIG.tileSize;
+    canvas.height = CONFIG.rows * CONFIG.tileSize;
+    if (state.map.length === CONFIG.rows) draw();
+}
+
+function startGameLoop() {
+    if (animationFrameId !== null) return;
+    animationFrameId = requestAnimationFrame(gameLoop);
 }
 
 function resetGame() {
@@ -354,11 +357,12 @@ function updateParticles() {
 }
 
 let lastTime = 0;
+let animationFrameId = null;
 const FPS = 60;
 const frameInterval = 1000 / FPS;
 
 function gameLoop(currentTime) {
-    requestAnimationFrame(gameLoop);
+    animationFrameId = requestAnimationFrame(gameLoop);
     if (!currentTime) currentTime = performance.now();    
     const deltaTime = currentTime - lastTime;
 
@@ -403,7 +407,7 @@ function gameLoop(currentTime) {
                     const dy = p.target.y - p.y;
                     const dist = Math.hypot(dx, dy);
                     if (dist < speed) {
-                        p.target.hp -= p.type.damage;
+                        p.target.hp -= p.tower.getDamage();
                         if (p.type.id === 'trap') {
                             p.target.frozenTimer = 60;
                             p.target.frozenSpeedMultiplier = p.tower.getSlowMultiplier(p.target.isBoss);
@@ -478,7 +482,7 @@ function draw() {
     state.towers.filter(t => t.type.id === 'poison').forEach(t => {
         ctx.fillStyle = 'rgba(72, 187, 120, 0.15)';
         ctx.beginPath();
-        ctx.arc(t.x, t.y, t.type.range * CONFIG.tileSize, 0, Math.PI * 2);
+        ctx.arc(t.x, t.y, t.getRange(), 0, Math.PI * 2);
         ctx.fill();
     });
     for (const p of state.particles) {
@@ -698,13 +702,14 @@ async function saveGame() {
     playSfx('build');
     if (state.enemies.length > 0 && !confirm('Saving while a wave is active will reset enemy positions until the next wave begins.\nProceed?')) return;
     const saveData = {
+        version: SAVE_VERSION,
         wave: state.wave,
         money: state.money,
         lives: state.lives,
         map: state.map,
         startPoint: state.startPoint,
         endPoints: state.endPoints,
-        towers: state.towers.map(t => ({c: t.c, r: t.r, type: t.type.id}))
+        towers: state.towers.map(t => ({c: t.c, r: t.r, type: t.type.id, level: t.level}))
     };
     try {
         await navigator.clipboard.writeText(JSON.stringify(saveData));
@@ -715,13 +720,93 @@ async function saveGame() {
     }
 }
 
+function validateSaveData(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error('Save data must be an object.');
+    }
+    if (data.version !== undefined && data.version !== SAVE_VERSION) {
+        throw new Error(`Unsupported save version: ${data.version}`);
+    }
+    if (!Number.isInteger(data.wave) || data.wave < 1) {
+        throw new Error('Wave must be a positive integer.');
+    }
+    if (!Number.isFinite(data.money) || data.money < 0 || !Number.isFinite(data.lives) || data.lives < 0) {
+        throw new Error('Money and lives must be finite non-negative numbers.');
+    }
+    if (!Array.isArray(data.map) || data.map.length !== CONFIG.rows || data.map.some(row =>
+        !Array.isArray(row) || row.length !== CONFIG.cols || row.some(cell => cell !== 0 && cell !== 1))) {
+        throw new Error(`Map must be exactly ${CONFIG.rows}x${CONFIG.cols}.`);
+    }
+
+    const isOnBoard = point => point && Number.isInteger(point.c) && Number.isInteger(point.r) &&
+        point.c >= 0 && point.c < CONFIG.cols && point.r >= 0 && point.r < CONFIG.rows;
+    if (!isOnBoard(data.startPoint) || data.map[data.startPoint.r][data.startPoint.c] !== 1) {
+        throw new Error('Start point must be on the path and inside the map.');
+    }
+    if (!Array.isArray(data.endPoints) || data.endPoints.length === 0 || data.endPoints.length > CONFIG.cols) {
+        throw new Error('End points are invalid.');
+    }
+    for (const endPoint of data.endPoints) {
+        if (!isOnBoard(endPoint) || data.map[endPoint.r][endPoint.c] !== 1) {
+            throw new Error('Every end point must be on the path and inside the map.');
+        }
+    }
+
+    const reachable = new Set([`${data.startPoint.r},${data.startPoint.c}`]);
+    const queue = [data.startPoint];
+    const directions = [{r: 1, c: 0}, {r: -1, c: 0}, {r: 0, c: 1}, {r: 0, c: -1}];
+    while (queue.length > 0) {
+        const point = queue.shift();
+        for (const direction of directions) {
+            const r = point.r + direction.r;
+            const c = point.c + direction.c;
+            const key = `${r},${c}`;
+            if (r >= 0 && r < CONFIG.rows && c >= 0 && c < CONFIG.cols &&
+                data.map[r][c] === 1 && !reachable.has(key)) {
+                reachable.add(key);
+                queue.push({r, c});
+            }
+        }
+    }
+    if (data.endPoints.some(endPoint => !reachable.has(`${endPoint.r},${endPoint.c}`))) {
+        throw new Error('Every end point must be reachable from the start point.');
+    }
+
+    if (!Array.isArray(data.towers) || data.towers.length > CONFIG.rows * CONFIG.cols) {
+        throw new Error('Too many towers in save data.');
+    }
+    const occupied = new Set();
+    for (const tower of data.towers) {
+        if (!tower || typeof tower !== 'object' || !isOnBoard(tower) ||
+            typeof tower.type !== 'string' || !Object.hasOwn(TOWERS, tower.type)) {
+            throw new Error('Tower data contains an invalid position or type.');
+        }
+        if (data.map[tower.r][tower.c] === 1) {
+            throw new Error('Towers cannot be placed on the path.');
+        }
+        const key = `${tower.r},${tower.c}`;
+        if (occupied.has(key)) {
+            throw new Error('Multiple towers cannot occupy the same tile.');
+        }
+        occupied.add(key);
+        if (tower.level !== undefined && (!Number.isInteger(tower.level) ||
+            tower.level < 1 || tower.level > CONFIG.maxTowerLevel)) {
+            throw new Error('Tower level is invalid.');
+        }
+    }
+}
+
 function loadGame() {
     ensureAudio();
     playSfx('upgrade');
     const json = prompt('Paste your saved JSON data here:');
     if (!json) return;
     try {
+        if (json.length > MAX_SAVE_JSON_LENGTH) {
+            throw new Error('Save data is too large.');
+        }
         const data = JSON.parse(json);
+        validateSaveData(data);
         state.wave = data.wave;
         state.money = data.money;
         state.lives = data.lives;
@@ -735,7 +820,13 @@ function loadGame() {
             alert('Error: rebuildNavMap was not found. Check the map generation code.');
             return;
         }
-        state.towers = data.towers.map(tData => new Tower(tData.c, tData.r, tData.type));
+        state.towers = data.towers.map(tData => {
+            const tower = new Tower(tData.c, tData.r, tData.type);
+            if (Number.isInteger(tData.level)) {
+                tower.level = Math.min(CONFIG.maxTowerLevel, Math.max(1, tData.level));
+            }
+            return tower;
+        });
         state.enemies = [];
         state.projectiles = [];
         state.particles = [];
@@ -930,10 +1021,10 @@ class Tower {
 
     fire(target) {
         if (this.type.id === 'spray' || this.type.id === 'zapper') {
-            state.projectiles.push({x: this.x, y: this.y, tx: target.x, ty: target.y, target, type: this.type});
+            state.projectiles.push({x: this.x, y: this.y, tx: target.x, ty: target.y, target, tower: this, type: this.type});
             playSfx(this.type.id);
             if (this.type.id === 'zapper') {
-                target.hp -= this.type.damage;
+                target.hp -= this.getDamage();
                 createParticles(target.x, target.y, '#f6e05e', 5);
             }
         } else if (this.type.id === 'trap') {
@@ -942,8 +1033,8 @@ class Tower {
         } else if (this.type.id === 'poison') {
             for (const enemy of state.enemies) {
                 const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
-                if (dist <= this.type.range * CONFIG.tileSize) {
-                    enemy.hp -= this.type.damage;
+                if (dist <= this.getRange()) {
+                    enemy.hp -= this.getDamage();
                     if (Math.random() < 0.2) createParticles(enemy.x, enemy.y, '#68d391', 1);
                 }
             }
@@ -1061,4 +1152,4 @@ function rebuildNavMap() {
 canvas.addEventListener('mousedown', handleInput);
 canvas.addEventListener('touchstart', handleInput, {passive: false});
 window.onload = init;
-window.onresize = init;
+window.onresize = resizeCanvas;
