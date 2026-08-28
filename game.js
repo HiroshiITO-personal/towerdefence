@@ -430,7 +430,7 @@ function gameLoop(currentTime) {
 function draw() {
     ctx.save();
     if (state.shakeTimer > 0) {
-        const intensity = 7; // 揺れの強さ（ピクセル数）
+        const intensity = 7; 
         const dx = (Math.random() - 0.5) * intensity;
         const dy = (Math.random() - 0.5) * intensity;
         ctx.translate(dx, dy);
@@ -854,7 +854,7 @@ function loadGame() {
 }
 
 class Enemy {
-    constructor(typeIdx, wave, isBoss = false) {
+constructor(typeIdx, wave, isBoss = false) {
         const type = ENEMIES[typeIdx];
         this.type = type;
         this.isBoss = isBoss;
@@ -868,6 +868,9 @@ class Enemy {
         this.y = this.row * CONFIG.tileSize + CONFIG.tileSize / 2;
         let hpMultiplier = Math.pow(1.08, wave - 1);
         hpMultiplier += wave * 0.9;
+        if (wave > 10) {
+            hpMultiplier *= 1 + (wave - 10) * 0.035;
+        }
         if (isBoss) {
             hpMultiplier *= 5;
             this.speed = type.speed * CONFIG.tileSize * 0.5;
@@ -878,7 +881,8 @@ class Enemy {
             this.radius = CONFIG.tileSize * 0.35;
             this.reward = type.reward;
         }
-        const speedBoost = 1 + Math.min(0.5, wave * 0.01);
+        let speedBonus = wave <= 10 ? wave * 0.01 : 0.1 + (wave - 10) * 0.02;
+        const speedBoost = 1 + Math.min(0.65, speedBonus);
         this.speed *= speedBoost;
         this.maxHp = Math.floor(CONFIG.baseEnemyHp * type.hpMod * hpMultiplier);
         this.hp = this.maxHp;
