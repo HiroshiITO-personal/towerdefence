@@ -866,7 +866,7 @@ constructor(typeIdx, wave, isBoss = false) {
         this.targetR = this.row;
         this.x = this.col * CONFIG.tileSize + CONFIG.tileSize / 2;
         this.y = this.row * CONFIG.tileSize + CONFIG.tileSize / 2;
-        let hpMultiplier = Math.pow(1.08, wave - 1);
+git         let hpMultiplier = Math.pow(1.08, wave - 1);
         hpMultiplier += wave * 0.9;
         if (wave > 10) {
             hpMultiplier *= 1 + (wave - 10) * 0.035;
