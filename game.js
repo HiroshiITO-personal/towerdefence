@@ -866,7 +866,7 @@ constructor(typeIdx, wave, isBoss = false) {
         this.targetR = this.row;
         this.x = this.col * CONFIG.tileSize + CONFIG.tileSize / 2;
         this.y = this.row * CONFIG.tileSize + CONFIG.tileSize / 2;
-git         let hpMultiplier = Math.pow(1.08, wave - 1);
+        let hpMultiplier = Math.pow(1.08, wave - 1);
         hpMultiplier += wave * 0.9;
         if (wave > 10) {
             hpMultiplier *= 1 + (wave - 10) * 0.035;
@@ -933,7 +933,7 @@ git         let hpMultiplier = Math.pow(1.08, wave - 1);
                 return da - db;
             });
             let next = candidates[0] || nextOptions[0];
-            if (candidates.length > 1 && Math.random() < Math.max(0, 0.3 - (state.wave - 1) * 0.02)) {
+            if (candidates.length > 1 && Math.random() < Math.max(0, 0.6 - (state.wave - 1) * 0.02)) {
                 next = candidates[1 + Math.floor(Math.random() * (candidates.length - 1))];
                 this.wrongPathTimer = 45;
             }
