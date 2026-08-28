@@ -889,9 +889,11 @@ constructor(typeIdx, wave, isBoss = false) {
         this.baseSpeed = this.speed;
         this.frozenTimer = 0;
         this.frozenSpeedMultiplier = 1;
+        this.wrongPathTimer = 0;
     }
 
     update() {
+        if (this.wrongPathTimer > 0) this.wrongPathTimer--;
         if (this.frozenTimer > 0) {
             this.frozenTimer--;
             this.speed = this.baseSpeed * this.frozenSpeedMultiplier;
@@ -933,6 +935,7 @@ constructor(typeIdx, wave, isBoss = false) {
             let next = candidates[0] || nextOptions[0];
             if (candidates.length > 1 && Math.random() < Math.max(0, 0.3 - (state.wave - 1) * 0.02)) {
                 next = candidates[1 + Math.floor(Math.random() * (candidates.length - 1))];
+                this.wrongPathTimer = 45;
             }
             this.targetC = next.c;
             this.targetR = next.r;
@@ -961,6 +964,11 @@ constructor(typeIdx, wave, isBoss = false) {
         ctx.fillRect(this.x - barWidth / 2, barY, barWidth, 4);
         ctx.fillStyle = hpPercent < 0.3 ? '#fc8181' : (hpPercent < 0.6 ? '#f6ad55' : '#68d391');
         ctx.fillRect(this.x - barWidth / 2, barY, barWidth * hpPercent, 4);
+        if (this.wrongPathTimer > 0) {
+            ctx.fillStyle = '#2d3748';
+            ctx.font = `bold ${CONFIG.tileSize * 0.55}px Arial`;
+            ctx.fillText('?', this.x + barWidth / 2 + 8, barY - 2);
+        }
         if (this.frozenTimer > 0) {
             ctx.fillStyle = 'rgba(99, 179, 237, 0.4)';
             ctx.beginPath();
