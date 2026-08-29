@@ -918,21 +918,21 @@ constructor(typeIdx, wave, isBoss = false) {
                 this.targetR = this.row;
                 return 'active';
             }
-            const goal = state.endPoints[0];
-            const candidates = nextOptions.filter(next => !(next.c === this.prevC && next.r === this.prevR && nextOptions.length > 1));
-            if (candidates.length === 0) {
-                const prevPos = nextOptions.find(opt => opt.c === this.prevC && opt.r === this.prevR);
-                if (prevPos) candidates.push(prevPos);
-            }
-            candidates.sort((a, b) => {
-                const da = Math.abs(goal.c - a.c) + Math.abs(goal.r - a.r);
-                const db = Math.abs(goal.c - b.c) + Math.abs(goal.r - b.r);
-                return da - db;
-            });
-            let next = candidates[0] || nextOptions[0];
-            if (candidates.length > 1 && Math.random() < Math.max(0, 0.4 - (state.wave - 1) * 0.02)) {
-                next = candidates[1 + Math.floor(Math.random() * (candidates.length - 1))];
-                this.wrongPathTimer = 45;
+            const minDist = Math.min(...nextOptions.map(n => n.dist));
+            const bestCandidates = nextOptions.filter(next => next.dist === minDist && !(next.c === this.prevC && next.r === this.prevR && nextOptions.length > 1));
+            let candidates = bestCandidates.length > 0 ? bestCandidates : nextOptions.filter(next => next.dist === minDist);
+            
+            // 一定確率で最短ルート以外を選ぶ
+            let next = candidates[0];
+            if (Math.random() < Math.max(0, 0.4 - (state.wave - 1) * 0.02)) {
+                const wrongCandidates = nextOptions.filter(opt => opt.dist > minDist && !(opt.c === this.prevC && opt.r === this.prevR));
+                if (wrongCandidates.length > 0) {
+                    next = wrongCandidates[Math.floor(Math.random() * wrongCandidates.length)];
+                    this.wrongPathTimer = 45;
+                } else if (candidates.length > 1) {
+                    // 最短ルート以外がない場合は最短ルート内で別の選択肢を選ぶ
+                    next = candidates[Math.floor(Math.random() * candidates.length)];
+                }
             }
             this.targetC = next.c;
             this.targetR = next.r;
@@ -1152,7 +1152,7 @@ function rebuildNavMap() {
                     }
                 }
                 neighbors.sort((a, b) => a.dist - b.dist);
-                state.navMap[r][c] = neighbors.map(n => ({r: n.r, c: n.c}));
+                state.navMap[r][c] = neighbors;
             }
         }
     }
