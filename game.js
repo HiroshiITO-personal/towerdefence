@@ -6,8 +6,8 @@ const CONFIG = {
     startLives: 5,
     baseEnemyHp: 44,
     moneyPerKill: 6,
-    bossWaveInterval: 5,
-    upgradeCostShield: 0.9,
+    bossWaveInterval: 5,    
+    upgradeCostShield: 1.1,
     maxTowerLevel: 6
 };
 
@@ -376,7 +376,7 @@ function gameLoop(currentTime) {
                 if (state.waveTimer <= 0 && state.waveQueue.length > 0) {
                     const enemyData = state.waveQueue.shift();
                     state.enemies.push(new Enemy(enemyData.idx, state.wave, enemyData.isBoss));
-                    state.waveTimer = enemyData.isBoss ? 200 : Math.max(40, 55 - state.wave * 4);
+                    state.waveTimer = enemyData.isBoss ? 200 : Math.max(30, 60 - state.wave * 2);
                 } else if (state.waveQueue.length === 0 && state.enemies.length === 0) {
                     endWave();
                 }
@@ -402,13 +402,13 @@ function gameLoop(currentTime) {
             for (let i = state.projectiles.length - 1; i >= 0; i--) {
                 const p = state.projectiles[i];
                 if (p.type.id === 'spray' || p.type.id === 'trap') {
-                    const speed = p.type.id === 'spray' ? 9 : 7;
+                    const speed = 7;
                     const dx = p.target.x - p.x;
                     const dy = p.target.y - p.y;
                     const dist = Math.hypot(dx, dy);
                     if (dist < speed) {
                         p.target.hp -= p.tower.getDamage();
-                        if (p.type.id === 'trap') {
+                        if (p.type.id === 'trap' && !p.target.mutant) {
                             p.target.frozenTimer = 60;
                             p.target.frozenSpeedMultiplier = p.tower.getSlowMultiplier(p.target.isBoss);
                         }
@@ -858,6 +858,7 @@ constructor(typeIdx, wave, isBoss = false) {
         const type = ENEMIES[typeIdx];
         this.type = type;
         this.isBoss = isBoss;
+        this.mutant=!isBoss&&wave>10&&Math.random()<.05;
         this.col = state.startPoint.c;
         this.row = state.startPoint.r;
         this.prevC = this.col;
@@ -947,7 +948,7 @@ constructor(typeIdx, wave, isBoss = false) {
         ctx.font = `${CONFIG.tileSize * 0.7 * scale}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        if (this.isBoss) {
+        if (this.isBoss || this.mutant) {
             ctx.shadowBlur = 10;
             ctx.shadowColor = 'red';
         }
