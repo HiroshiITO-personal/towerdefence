@@ -8,7 +8,7 @@ const CONFIG = {
     moneyPerKill: 6,
     bossWaveInterval: 5,
     upgradeCostShield: 0.9,
-    maxTowerLevel: 5
+    maxTowerLevel: 6
 };
 
 const SAVE_VERSION = 1;
@@ -18,14 +18,14 @@ const TOWERS = {
     spray: {id: 'spray', name: 'Sparkle', icon: '🦄', cost: 60, range: 3.5, damage: 20, cooldown: 15, color: '#ff7ac6', desc: 'Bright magical beams.'},
     trap: {id: 'trap', name: 'Star Trap', icon: '✨', cost: 90, range: 2.2, damage: 10, slow: 0.4, cooldown: 8, color: '#fbbf24', desc: 'Slows rainbow invaders.'},
     zapper: {id: 'zapper', name: 'Rainbow Bolt', icon: '🌈', cost: 220, range: 4.5, damage: 100, cooldown: 65, color: '#8b5cf6', desc: 'Heavy boss damage.'},
-    poison: {id: 'poison', name: 'Moon Mist', icon: '💫', cost: 350, range: 3.0, damage: 5, cooldown: 5, area: true, color: '#34d399', desc: 'Area magic damage.'}
+    poison: {id: 'poison', name: 'Moon Mist', icon: '💫', cost: 350, range: 3.0, damage: 4, cooldown: 5, area: true, color: '#34d399', desc: 'Area magic damage.'}
 };
 
 const ENEMIES = [
     {name: 'Spark Bug', icon: '🐞', speed: 0.06, hpMod: 1.0, reward: 5},
-    {name: 'Rain Moth', icon: '🦋', speed: 0.09, hpMod: 1.2, reward: 12},
-    {name: 'Cloud Bat', icon: '🦇', speed: 0.04, hpMod: 3.5, reward: 20},
-    {name: 'Dew Fly', icon: '🪶', speed: 0.11, hpMod: 0.5, reward: 10}
+    {name: 'Rain Moth', icon: '🦋', speed: 0.09, hpMod: 1.2, reward: 9},
+    {name: 'Cloud Bat', icon: '🦇', speed: 0.04, hpMod: 3.5, reward: 14},
+    {name: 'Dew Fly', icon: '🪶', speed: 0.11, hpMod: 0.5, reward: 7}
 ];
 
 const state = {
@@ -392,9 +392,9 @@ function gameLoop(currentTime) {
                     createParticles(enemy.x, enemy.y, '#fc8181', 15);
                     if (state.lives <= 0) gameOver();
                 } else if (enemy.hp <= 0) {
-                    state.money += enemy.reward;
-                    if (enemy.isBoss) state.lives += 1;
-                    state.enemies.splice(i, 1);
+                    state.money+=enemy.reward;
+                    if(enemy.isBoss)state.lives=Math.min(CONFIG.startLives,state.lives+1);
+                    state.enemies.splice(i,1);
                     updateUI();
                     createParticles(enemy.x, enemy.y, '#68d391', 10);
                 }
@@ -504,7 +504,7 @@ function startWave() {
     state.waveQueue = [];
     const isBossWave = state.wave % CONFIG.bossWaveInterval === 0;
     if (isBossWave) showBossWarning();
-    const count = 10 + Math.floor(state.wave * 3) + Math.floor(state.wave / 5) * 2;
+    const count=Math.min(80,10+state.wave*3+(state.wave/5|0)*2);
     for (let i = 0; i < count; i++) {
         let typesAvailable = 1;
         if (state.wave >= 3) typesAvailable = 2;
@@ -865,12 +865,8 @@ constructor(typeIdx, wave, isBoss = false) {
         this.targetC = this.col;
         this.targetR = this.row;
         this.x = this.col * CONFIG.tileSize + CONFIG.tileSize / 2;
-        this.y = this.row * CONFIG.tileSize + CONFIG.tileSize / 2;
-        let hpMultiplier = Math.pow(1.08, wave - 1);
-        hpMultiplier += wave * 0.9;
-        if (wave > 10) {
-            hpMultiplier *= 1 + (wave - 10) * 0.035;
-        }
+        this.y = this.row * CONFIG.tileSize + CONFIG.tileSize / 2;        
+        let hpMultiplier=wave>20?30.13*1.04**(wave-20):(1.08**(wave-1)+wave*.9)*(wave>10?1+(wave-10)*.035:1);
         if (isBoss) {
             hpMultiplier *= 5;
             this.speed = type.speed * CONFIG.tileSize * 0.5;
@@ -889,9 +885,11 @@ constructor(typeIdx, wave, isBoss = false) {
         this.baseSpeed = this.speed;
         this.frozenTimer = 0;
         this.frozenSpeedMultiplier = 1;
+        this.wrongPathTimer = 0;
     }
 
     update() {
+        if (this.wrongPathTimer > 0) this.wrongPathTimer--;
         if (this.frozenTimer > 0) {
             this.frozenTimer--;
             this.speed = this.baseSpeed * this.frozenSpeedMultiplier;
@@ -931,8 +929,9 @@ constructor(typeIdx, wave, isBoss = false) {
                 return da - db;
             });
             let next = candidates[0] || nextOptions[0];
-            if (candidates.length > 1 && Math.random() < Math.max(0, 0.3 - (state.wave - 1) * 0.02)) {
+            if (candidates.length > 1 && Math.random() < Math.max(0, 0.4 - (state.wave - 1) * 0.02)) {
                 next = candidates[1 + Math.floor(Math.random() * (candidates.length - 1))];
+                this.wrongPathTimer = 45;
             }
             this.targetC = next.c;
             this.targetR = next.r;
@@ -961,6 +960,11 @@ constructor(typeIdx, wave, isBoss = false) {
         ctx.fillRect(this.x - barWidth / 2, barY, barWidth, 4);
         ctx.fillStyle = hpPercent < 0.3 ? '#fc8181' : (hpPercent < 0.6 ? '#f6ad55' : '#68d391');
         ctx.fillRect(this.x - barWidth / 2, barY, barWidth * hpPercent, 4);
+        if (this.wrongPathTimer > 0) {
+            ctx.fillStyle = '#2d3748';
+            ctx.font = `bold ${CONFIG.tileSize * 0.55}px Arial`;
+            ctx.fillText('?', this.x + barWidth / 2 + 8, barY - 2);
+        }
         if (this.frozenTimer > 0) {
             ctx.fillStyle = 'rgba(99, 179, 237, 0.4)';
             ctx.beginPath();
@@ -1006,13 +1010,13 @@ class Tower {
     update() {
         if (this.cooldown > 0) this.cooldown--;
         const range = this.getRange();
-        let target = null;
-        let minDist = Infinity;
-        for (const enemy of state.enemies) {
-            const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
-            if (dist <= range && dist < minDist) {
-                minDist = dist;
-                target = enemy;
+        let target=null,minDist=1/0;
+        for(const enemy of state.enemies){
+            let dist=Math.hypot(enemy.x-this.x,enemy.y-this.y);
+            let score=dist-(this.type.id==='zapper'&&enemy.isBoss)*1e6;
+            if(dist<=range&&score<minDist){
+                minDist=score;
+                target=enemy;
             }
         }
         if (!target) return;
