@@ -408,7 +408,7 @@ function gameLoop(currentTime) {
                     const dist = Math.hypot(dx, dy);
                     if (dist < speed) {
                         p.target.hp -= p.tower.getDamage();
-                        if (p.type.id === 'trap') {
+                        if (p.type.id === 'trap' && !p.target.mutant) {
                             p.target.frozenTimer = 60;
                             p.target.frozenSpeedMultiplier = p.tower.getSlowMultiplier(p.target.isBoss);
                         }
@@ -858,6 +858,7 @@ constructor(typeIdx, wave, isBoss = false) {
         const type = ENEMIES[typeIdx];
         this.type = type;
         this.isBoss = isBoss;
+        this.mutant=!isBoss&&wave>10&&Math.random()<.02;
         this.col = state.startPoint.c;
         this.row = state.startPoint.r;
         this.prevC = this.col;
@@ -947,9 +948,9 @@ constructor(typeIdx, wave, isBoss = false) {
         ctx.font = `${CONFIG.tileSize * 0.7 * scale}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        if (this.isBoss) {
+        if (this.isBoss || this.mutant) {
             ctx.shadowBlur = 10;
-            ctx.shadowColor = 'red';
+            ctx.shadowColor = this.isBoss ? 'red' : '#f0f';
         }
         ctx.fillText(this.type.icon, this.x, this.y);
         ctx.shadowBlur = 0;
