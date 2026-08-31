@@ -265,10 +265,10 @@ function playSfx(kind) {
         playNoise(0.3, 0.05, 800, 0.05);
     } else if (kind === 'spray') {
         const now = audio.ctx.currentTime;
-        playTone(587.33, 0.15, 0.09, 'sawtooth', 0, 1174.66, true, 0.005);
-        playTone(1174.66, 0.18, 0.07, 'sine', 0.01, 2349.32, true, 0.003);
-        playTone(293.66, 0.14, 0.08, 'triangle', 0, 146.83, true, 0.005);
-        playNoise(0.15, 0.07, 3500, 0);
+        playTone(587.33, 0.15, 0.12, 'sawtooth', 0, 1174.66, true, 0.005);
+        playTone(1174.66, 0.20, 0.10, 'sine', 0.01, 2349.32, true, 0.003);
+        playTone(293.66, 0.16, 0.10, 'triangle', 0, 146.83, true, 0.005);
+        playNoise(0.12, 0.04, 3500, 0);
     } else if (kind === 'trap') {
         playTone(440, 0.22, 0.05, 'sawtooth', 0, 80);
         playTone(311.13, 0.25, 0.02, 'square', 0.02, 60);
@@ -277,9 +277,9 @@ function playSfx(kind) {
         const rainbowFreqs = [1046.50, 1318.51, 1567.98, 2093.00, 2637.02, 3135.96];
         rainbowFreqs.forEach((freq, index) => {
             const delay = index * 0.025;
-            playTone(freq, 0.28, 0.06, 'sawtooth', delay, freq * 1.08, true, 0.002);
-            playTone(freq * 1.5, 0.20, 0.04, 'sine', delay + 0.005, null, true, 0.001);
-            playTone(freq * 2.0, 0.15, 0.03, 'triangle', delay + 0.01, null, true, 0.001);
+            playTone(freq, 0.40, 0.12, 'sawtooth', delay, freq * 1.08, true, 0.002);
+            playTone(freq * 1.5, 0.30, 0.09, 'sine', delay + 0.005, null, true, 0.001);
+            playTone(freq * 2.0, 0.25, 0.07, 'triangle', delay + 0.01, null, true, 0.001);
         });
         playTone(261.63, 0.18, 0.08, 'sine', 0, 130.81, true, 0.005);
         playNoise(0.25, 0.04, 8000, 0);
@@ -601,7 +601,7 @@ function setupUI() {
         const t = TOWERS[key];
         const btn = document.createElement('div');
         btn.className = 'tower-btn';
-        btn.innerHTML = `<div class="tower-icon">${t.icon}</div><div class="tower-cost">$${t.cost}</div><div class="tower-name">${t.name}</div>`;
+        btn.innerHTML = `<div class="tower-icon">${t.icon}</div><div class="tower-cost">🌟${t.cost}</div><div class="tower-name">${t.name}</div>`;
         btn.onclick = () => selectTower(key, btn);
         towerControls.appendChild(btn);
         towerButtons.push(btn);
