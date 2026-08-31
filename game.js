@@ -202,8 +202,29 @@ function playTone(freq = 440, duration = 0.12, volume = 0.08, type = 'sine', del
 }
 
 function playBGM(freq, duration, volume, type = 'triangle', delay = 0) {
-    playTone(freq, duration, volume, type, delay, null, false, 0.08);
+    if (!audio.ctx || !audio.master) return;
+    const t = audio.ctx.currentTime + delay;
+    const osc = audio.ctx.createOscillator();
+    const gain = audio.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    const attack = 0.08;
+    const safeDuration = Math.max(duration, attack + 0.02);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(
+        Math.max(0.0001, volume),
+        t + attack
+    );
+    gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        t + safeDuration
+    );
+    osc.connect(gain);
+    gain.connect(audio.master);
+    osc.start(t);
+    osc.stop(t + safeDuration + 0.05);
 }
+
 
 function playNoise(duration = 0.1, volume = 0.05, cutoff = 1000, delay = 0) {
     if (!audio.ctx || !audio.noiseBuffer) return;
