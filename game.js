@@ -62,6 +62,8 @@ const uiWave = document.getElementById('wave-display');
 const waveBtn = document.getElementById('wave-btn');
 const towerControls = document.getElementById('tower-controls');
 const upgradeBtn = document.getElementById('upgrade-btn');
+const saveBtn = document.getElementById('save-btn');
+const loadBtn = document.getElementById('load-btn');
 const modalOverlay = document.getElementById('modal-overlay');
 const modalTitle = document.getElementById('modal-title');
 const modalMessage = document.getElementById('modal-message');
@@ -574,6 +576,18 @@ function setupUI() {
         startBGM();
         startWave();
     };
+    upgradeBtn.onclick = () => {
+        unlockAudio();
+        selectUpgradeMode();
+    };
+    saveBtn.onclick = () => {
+        unlockAudio();
+        saveGame();
+    };
+    loadBtn.onclick = () => {
+        unlockAudio();
+        loadGame();
+    };
 }
 
 function selectTower(key, btnElement) {
@@ -711,13 +725,21 @@ async function saveGame() {
         endPoints: state.endPoints,
         towers: state.towers.map(t => ({c: t.c, r: t.r, type: t.type.id, level: t.level}))
     };
-    try {
-        await navigator.clipboard.writeText(JSON.stringify(saveData));
-        alert('✅ Saved to clipboard!\n\nPaste it into a notes app or text file to keep your rainbow progress safe.');
-    } catch (err) {
-        console.error(err);
-        alert('Save failed because clipboard access was denied.');
+    const jsonString = JSON.stringify(saveData);
+    
+    // Try to use clipboard API if available
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+            await navigator.clipboard.writeText(jsonString);
+            alert('✅ Saved to clipboard!\n\nPaste it into a notes app or text file to keep your rainbow progress safe.');
+            return;
+        } catch (err) {
+            console.warn('Clipboard access failed, falling back to prompt:', err);
+        }
     }
+    
+    // Fallback: show JSON in prompt for manual copy
+    prompt('📋 Copy this data (Ctrl+C or Cmd+C):', jsonString);
 }
 
 function validateSaveData(data) {
