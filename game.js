@@ -64,6 +64,7 @@ const towerControls = document.getElementById('tower-controls');
 const upgradeBtn = document.getElementById('upgrade-btn');
 const saveBtn = document.getElementById('save-btn');
 const loadBtn = document.getElementById('load-btn');
+const bgmBtn = document.getElementById('bgm-btn');
 const modalOverlay = document.getElementById('modal-overlay');
 const modalTitle = document.getElementById('modal-title');
 const modalMessage = document.getElementById('modal-message');
@@ -71,7 +72,7 @@ const modalBtn = document.getElementById('modal-btn');
 const bossWarning = document.getElementById('boss-warning');
 const towerButtons = [];
 
-const audio = {ctx: null,master: null,fxBus: null,noiseBuffer: null,distCurve: null,bgmTimer: null,bgmStep: 0,unlocked: false};
+const audio = {ctx: null,master: null,fxBus: null,noiseBuffer: null,distCurve: null,bgmTimer: null,bgmStep: 0,unlocked: false,bgmEnabled: true};
 
 function ensureAudio() {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -295,7 +296,7 @@ const BGM_NOTES = [0,130.81,146.83,164.81,174.61,196.00,220.00,233.08,261.63,293
 
 function startBGM() {
     const ctx = ensureAudio();
-    if (!ctx || audio.bgmTimer) return;
+    if (!ctx || audio.bgmTimer || !audio.bgmEnabled) return;
     const melody = [9, 10, 11, 12, 11, 10, 9, 8,9, 11, 13, 15, 13, 12, 11, 12,13, 14, 13, 12, 11, 10, 9, 10,11, 12, 10, 9, 9, 0, 9, 0];
 
     const drone = [2, 2, 2, 2, 2, 2, 2, 1,2, 4, 6, 6, 6, 5, 4, 5,6, 7, 6, 5, 4, 2, 2, 3,4, 5, 3, 2, 2, 0, 2, 0];
@@ -322,6 +323,19 @@ function stopBGM() {
         clearInterval(audio.bgmTimer);
         audio.bgmTimer = null;
     }
+}
+
+function toggleBGM() {
+    audio.bgmEnabled = !audio.bgmEnabled;
+    if (audio.bgmEnabled) {
+        startBGM();
+    } else {
+        stopBGM();
+    }
+}
+
+function updateBGMButton() {
+    bgmBtn.textContent = audio.bgmEnabled ? '🎵 BGM ON' : '🔇 BGM OFF';
 }
 
 function init() {
@@ -609,6 +623,11 @@ function setupUI() {
         unlockAudio();
         loadGame();
     };
+    bgmBtn.onclick = () => {
+        toggleBGM();
+        updateBGMButton();
+    };
+    updateBGMButton();
 }
 
 function selectTower(key, btnElement) {
