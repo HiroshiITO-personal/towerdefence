@@ -17,7 +17,7 @@ const MAX_SAVE_JSON_LENGTH = 1000000;
 const TOWERS = {
     spray: {id: 'spray', name: 'Sparkle', icon: '🦄', cost: 60, range: 3.5, damage: 20, cooldown: 15, color: '#ff7ac6', desc: 'Bright magical beams.'},
     trap: {id: 'trap', name: 'Star Trap', icon: '✨', cost: 90, range: 2.2, damage: 8, slow: 0.4, cooldown: 8, color: '#fbbf24', desc: 'Slows rainbow invaders.'},
-    zapper: {id: 'zapper', name: 'Rainbow Bolt', icon: '🌈', cost: 180, range: 4.5, damage: 180, cooldown: 60, color: '#8b5cf6', desc: 'Heavy boss damage.'},
+    zapper: {id: 'zapper', name: 'Rainbow Bolt', icon: '🌈', cost: 180, range: 4.5, damage: 260, cooldown: 60, color: '#8b5cf6', desc: 'Heavy boss damage.'},
     poison: {id: 'poison', name: 'Moon Mist', icon: '💫', cost: 350, range: 3.0, damage: 4, cooldown: 5, area: true, color: '#34d399', desc: 'Area magic damage.'}
 };
 
@@ -929,8 +929,13 @@ constructor(typeIdx, wave, isBoss = false) {
         this.y = this.row * CONFIG.tileSize + CONFIG.tileSize / 2;        
         let hpMultiplier=wave>20?30.13*1.04**(wave-20):(1.08**(wave-1)+wave*.9)*(wave>10?1+(wave-10)*.035:1);
         if (isBoss) {
-            hpMultiplier *= 6.8;
-            this.speed = type.speed * CONFIG.tileSize * 0.5;
+            const bossHpMultiplier = wave === 5 ? 10.75 : 6.5;
+            const bossSpeedMultiplier = wave === 5 ? 0.5 : 0.55;
+            hpMultiplier *= bossHpMultiplier;
+            this.speed =
+                type.speed *
+                CONFIG.tileSize *
+                bossSpeedMultiplier;
             this.radius = CONFIG.tileSize * 0.6;
             this.reward = type.reward * 7;
         } else {
