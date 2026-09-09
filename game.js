@@ -15,7 +15,7 @@ const SAVE_VERSION = 1;
 const MAX_SAVE_JSON_LENGTH = 1000000;
 
 const TOWERS = {
-    spray: {id: 'spray', name: 'Sparkle', icon: '🦄', cost: 60, range: 3.5, damage: 20, cooldown: 15, color: '#ff7ac6', desc: 'Bright magical beams.'},
+    spray: {id: 'spray', name: 'Unicorn', icon: '🦄', cost: 60, range: 3.5, damage: 20, cooldown: 15, color: '#ff7ac6', desc: 'Bright magical beams.'},
     trap: {id: 'trap', name: 'Star Trap', icon: '✨', cost: 90, range: 2.2, damage: 4, slow: 0.4, cooldown: 8, color: '#fbbf24', desc: 'Slows rainbow invaders.'},
     zapper: {id: 'zapper', name: 'Rainbow Bolt', icon: '🌈', cost: 180, range: 4.5, damage: 270, cooldown: 60, color: '#8b5cf6', desc: 'Heavy boss damage.'},
     poison: {id: 'poison', name: 'Moon Mist', icon: '💫', cost: 420, range: 3.0, damage: 4, cooldown: 5, area: true, color: '#34d399', desc: 'Area magic damage.'}
