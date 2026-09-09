@@ -91,7 +91,7 @@ Sparkle fires bright magical projectiles at nearby enemies.
 A rapid control tower that damages and slows enemies.
 
 - **Cost:** 90 Magic
-- **Base damage:** 10
+- **Base damage:** 4
 - **Range:** 2.2 tiles
 - **Cooldown:** 8 frames
 - **Role:** Crowd control
@@ -104,10 +104,10 @@ Mutant enemies cannot be slowed.
 
 A long-range tower that delivers powerful rainbow strikes.
 
-- **Cost:** 220 Magic
-- **Base damage:** 100
+- **Cost:** 180 Magic
+- **Base damage:** 270
 - **Range:** 4.5 tiles
-- **Cooldown:** 65 frames
+- **Cooldown:** 60 frames
 - **Role:** Boss and heavy-enemy damage
 
 Rainbow Bolt automatically prioritizes bosses when they are within range.
@@ -116,9 +116,9 @@ Rainbow Bolt automatically prioritizes bosses when they are within range.
 
 An area-of-effect tower that damages every enemy within its magical field.
 
-- **Cost:** 350 Magic
+- **Cost:** 420 Magic
 - **Base damage:** 4 per attack
-- **Range:** 3 tiles
+- **Range:** 3.0 tiles
 - **Cooldown:** 5 frames
 - **Role:** Large enemy groups
 
