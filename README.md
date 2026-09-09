@@ -74,7 +74,7 @@ Enemy count, health, speed, and variety increase as the game progresses.
 
 ## Magical Towers
 
-### 🦄 Sparkle
+### 🦄 Unicorn
 
 A fast, inexpensive general-purpose tower.
 
@@ -84,7 +84,7 @@ A fast, inexpensive general-purpose tower.
 - **Cooldown:** 15 frames
 - **Role:** Early defense and sustained damage
 
-Sparkle fires bright magical projectiles at nearby enemies.
+Unicorn fires bright magical projectiles at nearby enemies.
 
 ### ✨ Star Trap
 
@@ -233,7 +233,7 @@ Difficulty also scales through:
 
 ### Keyboard
 
-- `1`: Select Sparkle
+- `1`: Select Unicorn
 - `2`: Select Star Trap
 - `3`: Select Rainbow Bolt
 - `4`: Select Moon Mist
@@ -254,7 +254,7 @@ A tower cannot be placed:
 
 ## Strategy Tips
 
-- Build Sparkle towers during the early waves.
+- Build Unicorn towers during the early waves.
 - Place towers near bends so enemies remain in range longer.
 - Combine Star Trap with Rainbow Bolt or Moon Mist.
 - Save Magic before every fifth wave.
