@@ -4,7 +4,7 @@ const CONFIG = {
     rows: 9,
     startMoney: 150,
     startLives: 5,
-    baseEnemyHp: 44,
+    baseEnemyHp: 49,
     moneyPerKill: 6,
     bossWaveInterval: 5,    
     upgradeCostShield: 1.1,
@@ -541,7 +541,7 @@ function startWave() {
     state.waveQueue = [];
     const isBossWave = state.wave % CONFIG.bossWaveInterval === 0;
     if (isBossWave) showBossWarning();
-    const count=Math.min(80,10+state.wave*3+(state.wave/5|0)*2);
+    const count = Math.min(90, 12 + state.wave * 3 + (state.wave / 5 | 0) * 3);
     for (let i = 0; i < count; i++) {
         let typesAvailable = 1;
         if (state.wave >= 3) typesAvailable = 2;
@@ -562,7 +562,7 @@ function startWave() {
             state.waveQueue.splice(randomIndex, 0, bossData);
         }
     }
-    state.waveTimer = 30;
+    state.waveTimer = 28;
 }
 
 function showBossWarning() {
@@ -951,8 +951,8 @@ constructor(typeIdx, wave, isBoss = false) {
             this.radius = CONFIG.tileSize * 0.35;
             this.reward = type.reward;
         }
-        let speedBonus = wave <= 10 ? wave * 0.01 : 0.1 + (wave - 10) * 0.02;
-        const speedBoost = 1 + Math.min(0.65, speedBonus);
+        let speedBonus = wave <= 10 ? wave * 0.015 : 0.15 + (wave - 10) * 0.025;
+        const speedBoost = 1 + Math.min(0.8, speedBonus);
         this.speed *= speedBoost;
         this.maxHp = Math.floor(CONFIG.baseEnemyHp * type.hpMod * hpMultiplier);
         this.hp = this.maxHp;
